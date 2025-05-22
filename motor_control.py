@@ -1,3 +1,5 @@
+# 예제코드 카피 한거임 
+
 import RPi.GPIO as GPIO
 from time import sleep
 
