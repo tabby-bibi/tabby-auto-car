@@ -6,3 +6,6 @@ http://lhdangerous.godohosting.com/wiki/index.php/Raspberry_pi_%ec%97%90%ec%84%9
 
 DC모터 (제품사진)
 https://www.icbanq.com/P007408574?srsltid=AfmBOoo6o3KfTCaCMqOA2fs5ofVyO26zxJglIUa6hEtnWl-O2PKdlv5T
+
+자율주행 OpenCv 딥러닝 코드 내용 관한 링크
+https://github.com/JD-edu/deepThinkCar_mini
