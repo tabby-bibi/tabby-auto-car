@@ -117,11 +117,21 @@ def main():
 
             filtered = filter_white(frame)  # 흰색 차선 필터링
             gray = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)  # 그레이스케일 변환
-            edges = cv2.Canny(gray, 50, 120)  # 엣지 검출
+
+            # ★ Canny 엣지 민감도 조정 (기존 50,120 -> 30,100)
+            edges = cv2.Canny(gray, 30, 100)
+
             masked = region_of_interest(edges)  # ROI 마스킹
 
-            # 허프 직선 변환으로 차선 후보 찾기
-            lines = cv2.HoughLinesP(masked, 1, np.pi/180, threshold=30, minLineLength=40, maxLineGap=20)
+            # ★ HoughLinesP 민감도 조정 (threshold 낮추고 minLineLength 줄임)
+            lines = cv2.HoughLinesP(
+                masked,
+                rho=1,
+                theta=np.pi/180,
+                threshold=20,      # 기존 30 -> 20으로 낮춤
+                minLineLength=20,  # 기존 40 -> 20으로 줄임
+                maxLineGap=30      # 기존 20 -> 30으로 늘림
+            )
 
             # 차선 좌/우 분리
             left_points, right_points = separate_lines(lines, img_center)
@@ -156,18 +166,17 @@ def main():
                     cv2.line(frame, right_line[0], right_line[1], (0, 255, 255), 5)
 
                     # 주행 방향 결정
-                    direction = decide_direction(center_lane_x, img_center,left_slope,right_slope)
+                    direction = decide_direction(center_lane_x, img_center, left_slope, right_slope)
 
                     if direction == "straight":
                         car.update(direction=None)
-                        car.set_motor_forward()         # 방향 조향 정지
-                    if direction == "right":
+                        car.set_motor_forward()  # 방향 조향 정지
+                    elif direction == "right":
                         car.update(direction="right")
-                    if direction == "left":
+                    elif direction == "left":
                         car.update(direction="left")
                     else:
-                        car.update(direction=None)
-                                                        # 완전정지
+                        car.update(direction=None)  # 완전정지
 
                     cv2.putText(frame, f"Direction: {direction}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
 
@@ -182,8 +191,6 @@ def main():
 
             # 결과 영상 출력
             cv2.imshow("Lane Detection", frame)
-            
-            
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -195,6 +202,7 @@ def main():
         car.stop_drive()  # 종료 시 차량 정지
         picam2.stop()     # 카메라 종료
         cv2.destroyAllWindows()  # 창 닫기
+
 
 # 프로그램 시작점
 if __name__ == "__main__":
