@@ -5,7 +5,7 @@ from picamera2 import Picamera2
 from car_controller import CarController
 
 # 관심 영역 ROI 비율 설정
-POLY_BOTTOM_WIDTH = 1.5
+POLY_BOTTOM_WIDTH = 2.0
 POLY_TOP_WIDTH = 0.3
 POLY_HEIGHT = 0.6
 
