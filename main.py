@@ -55,7 +55,7 @@ def separate_lines(lines, img_center):
             continue
         slope = (y2 - y1) / (x2 - x1)  # 기울기 계산
 
-        if abs(slope) < 0.3:  # 기울기가 거의 없는 선(수평선)은 무시
+        if abs(slope) < 0.2:  # 기울기가 거의 없는 선(수평선)은 무시
             continue
 
         # 좌측 차선: 음의 기울기이며 이미지 중심 왼쪽에 위치
@@ -88,11 +88,11 @@ def make_line_points(y1, y2, slope, intercept):
 
 # 차선 중앙이 이미지 중앙보다 좌/우에 있는지에 따라 방향 결정
 def decide_direction(center_lane_x, img_center,left_slope,right_slope,
-position_thresh=30, slope_thresh=0.6,slope_diff_thresh=0.5):
+position_thresh=30,slope_diff_thresh=0.5):
     
     diff = center_lane_x - img_center
     
-    if abs(diff) > position_thresh and abs(left_slope) > slope_thresh and abs(right_slope) > slope_thresh and abs(left_slope - right_slope) > slope_diff_thresh:
+    if abs(diff) > position_thresh and abs(left_slope) > slope_thresh and abs(right_slope) > slope_thresh:
   
         return "right" if diff > 0 else "left"
     return "straight"
@@ -119,7 +119,7 @@ def main():
             gray = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)  # 그레이스케일 변환
 
             # ★ Canny 엣지 민감도 조정 (기존 50,120 -> 30,100)
-            edges = cv2.Canny(gray, 30, 100)
+            edges = cv2.Canny(gray, 20, 80)
 
             masked = region_of_interest(edges)  # ROI 마스킹
 
@@ -128,9 +128,9 @@ def main():
                 masked,
                 rho=1,
                 theta=np.pi/180,
-                threshold=20,      # 기존 30 -> 20으로 낮춤
-                minLineLength=20,  # 기존 40 -> 20으로 줄임
-                maxLineGap=30      # 기존 20 -> 30으로 늘림
+                threshold=15,      # 기존 30 -> 20으로 낮춤
+                minLineLength=15,  # 기존 40 -> 20으로 줄임
+                maxLineGap=35      # 기존 20 -> 30으로 늘림
             )
 
             # 차선 좌/우 분리
