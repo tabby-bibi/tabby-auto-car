@@ -1,215 +1,192 @@
+# OpenCV와 NumPy는 영상 처리에 사용됨
 import cv2
 import numpy as np
-from picamera2 import Picamera2
 import time
+
+# Raspberry Pi Camera 2용 라이브러리
+from picamera2 import Picamera2
+
+# 사용자 정의 차량 제어 클래스 (앞서 작성한 car_controller.py에 포함)
 from car_controller import CarController
 
-# ================================
-# 영상에서 흰색 테이프만 필터링
-# ================================
-def filter_white_tape(img):
-    """
-    BGR 이미지에서 밝은 흰색 영역만 필터링합니다.
-    흰색 테이프만 검출하기 위함.
-    """
-    lower_white = np.array([200, 200, 200])  # BGR 최소값
-    upper_white = np.array([255, 255, 255])  # BGR 최대값
+# 관심 영역 설정 비율 (차선 검출에 사용할 하단 다각형 ROI 범위 설정용)
+POLY_BOTTOM_WIDTH = 0.9  # 이미지 하단의 ROI 너비 비율
+POLY_TOP_WIDTH = 0.2     # 이미지 상단의 ROI 너비 비율
+POLY_HEIGHT = 0.6        # 이미지에서 ROI의 높이 비율
 
-    # 지정한 범위 내 픽셀을 흰색(255), 나머지는 검정(0)으로 마스크 생성
-    mask = cv2.inRange(img, lower_white, upper_white)
-    # 원본 이미지에서 흰색 영역만 추출
-    filtered = cv2.bitwise_and(img, img, mask=mask)
-    return filtered
+# 흰색 필터링 함수 (차선이 흰색일 경우 유용)
+def filter_white(img):
+    """흰색 영역만 추출하는 필터링 함수"""
+    lower = np.array([200, 200, 200])  # BGR 흰색 하한
+    upper = np.array([255, 255, 255])  # BGR 흰색 상한
+    mask = cv2.inRange(img, lower, upper)  # 범위에 해당하는 부분만 추출
+    return cv2.bitwise_and(img, img, mask=mask)  # 원본 이미지에서 흰색 부분만 남김
 
-# ==================================
-# 엣지 검출 및 관심 영역 마스킹 함수
-# ==================================
+# 관심 영역(ROI)을 적용하여 하단 차선 부분만 남기는 함수
 def region_of_interest(img):
-    """
-    입력된 이미지에서 관심 영역(도로 영역)만 추출하는 함수
-    차선이 위치할 가능성이 높은 삼각형 영역만 검출한다.
-    """
-    height, width = img.shape[:2]
-    mask = np.zeros_like(img)  # 입력 이미지와 같은 크기의 검정 마스크 생성
+    height, width = img.shape[:2]  # 이미지 높이와 너비 가져오기
+    mask = np.zeros_like(img[:,:,0])  # 마스크는 그레이스케일 형식 (초기값 0)
 
-    # 삼각형 모양의 관심 영역 꼭지점 좌표
-    polygon = np.array([
-        [(int(width * 0.1), height),          # 왼쪽 아래 모서리
-         (int(width * 0.45), int(height * 0.6)),  # 왼쪽 위 쪽
-         (int(width * 0.55), int(height * 0.6)),  # 오른쪽 위 쪽
-         (int(width * 0.9), height)]          # 오른쪽 아래 모서리
-    ])
+    # ROI 다각형 좌표 계산
+    polygon = np.array([[  
+        (int(width * (1 - POLY_BOTTOM_WIDTH) / 2), height),
+        (int(width * (1 - POLY_TOP_WIDTH) / 2), int(height * (1 - POLY_HEIGHT))),
+        (int(width * (1 + POLY_TOP_WIDTH) / 2), int(height * (1 - POLY_HEIGHT))),
+        (int(width * (1 + POLY_BOTTOM_WIDTH) / 2), height)
+    ]], np.int32)
 
-    # 마스크에 흰색으로 관심 영역 채우기
+    # ROI 영역 마스크에 흰색 채우기
     cv2.fillPoly(mask, polygon, 255)
+    masked_img = cv2.bitwise_and(img, img, mask=mask)  # ROI 바깥은 제거
+    return masked_img
 
-    # 입력 영상과 마스크를 bitwise_and 연산하여 관심 영역만 추출
-    masked_image = cv2.bitwise_and(img, mask)
-    return masked_image
-
-# =======================
-# 허프 변환으로 직선 검출
-# =======================
-def hough_lines(img):
-    """
-    엣지 이미지에서 허프 변환으로 직선을 검출한다.
-    """
-    # rho, theta, threshold, minLineLength, maxLineGap 조절 필요
-    lines = cv2.HoughLinesP(img, 1, np.pi / 180, threshold=30, minLineLength=40, maxLineGap=100)
-    return lines
-
-# ===============================
-# 직선을 좌우 차선으로 분리하는 함수
-# ===============================
-def separate_lines(lines, img_width):
-    """
-    검출된 모든 직선을 좌우로 분리한다.
-    기울기가 양수면 우측, 음수면 좌측 차선으로 판단.
-    """
+# 허프 직선 결과를 좌우 차선으로 분리하는 함수
+def separate_lines(lines, img_center):
     left_lines = []
     right_lines = []
-    slope_threshold = 0.3  # 너무 수평인 선은 제외
 
     if lines is None:
         return left_lines, right_lines
 
     for line in lines:
-        for x1, y1, x2, y2 in line:
-            if x2 - x1 == 0:  # 기울기 계산 중 0 나누기 방지
-                continue
-            slope = (y2 - y1) / (x2 - x1)
-            if abs(slope) < slope_threshold:
-                continue
+        x1, y1, x2, y2 = line[0]
 
-            if slope < 0 and x1 < img_width // 2 and x2 < img_width // 2:
-                left_lines.append((x1, y1, x2, y2))
-            elif slope > 0 and x1 > img_width // 2 and x2 > img_width // 2:
-                right_lines.append((x1, y1, x2, y2))
+        if x2 - x1 == 0:  # 기울기가 무한인 수직선 제거
+            continue
+        slope = (y2 - y1) / (x2 - x1)  # 기울기 계산
+
+        if abs(slope) < 0.3:  # 기울기가 거의 없는 선(수평선)은 무시
+            continue
+
+        # 좌측 차선: 음의 기울기이며 이미지 중심 왼쪽에 위치
+        if slope < 0 and x1 < img_center and x2 < img_center:
+            left_lines.append([x1, y1])
+            left_lines.append([x2, y2])
+        # 우측 차선: 양의 기울기이며 이미지 중심 오른쪽에 위치
+        elif slope > 0 and x1 > img_center and x2 > img_center:
+            right_lines.append([x1, y1])
+            right_lines.append([x2, y2])
     return left_lines, right_lines
 
-# =======================================
-# 여러 직선을 하나의 직선으로 회귀선 산출하는 함수
-# =======================================
-def fit_line(lines):
-    """
-    여러 점들을 모아 선형 회귀를 하여
-    하나의 대표 직선(기울기, 절편)을 계산한다.
-    """
-    if len(lines) == 0:
+# 점들로부터 선형 회귀하여 직선의 기울기와 y절편을 구함
+def fit_line(points):
+    if len(points) == 0:
         return None
+    points = np.array(points)
+    [vx, vy, x, y] = cv2.fitLine(points, cv2.DIST_L2, 0, 0.01, 0.01)
+    slope = vy / vx
+    intercept = y - slope * x
+    return slope[0], intercept[0]
 
-    x_coords = []
-    y_coords = []
-
-    for x1, y1, x2, y2 in lines:
-        x_coords.extend([x1, x2])
-        y_coords.extend([y1, y2])
-
-    # np.polyfit으로 1차 다항식(직선) 피팅
-    fit = np.polyfit(x_coords, y_coords, 1)  # y = m*x + b
-    slope = fit[0]
-    intercept = fit[1]
-    return slope, intercept
-
-# =======================
-# 회귀선 좌표 계산 함수
-# =======================
+# 기울기와 절편으로 실제 두 점을 만들어 직선을 시각화
 def make_line_points(y1, y2, slope, intercept):
-    """
-    y축 시작과 끝 위치와
-    회귀선의 기울기, 절편으로
-    x축 시작과 끝 좌표 계산
-    """
-    if slope == 0:  # 기울기 0 방지
-        x1 = x2 = 0
-    else:
-        x1 = int((y1 - intercept) / slope)
-        x2 = int((y2 - intercept) / slope)
-    return (x1, y1, x2, y2)
+    if slope == 0:
+        return None
+    x1 = int((y1 - intercept) / slope)
+    x2 = int((y2 - intercept) / slope)
+    return (x1, int(y1)), (x2, int(y2))
 
-# ===================
-# 진행 방향 예측 함수
-# ===================
-def predict_direction(left_line, right_line, img_width):
-    """
-    좌우 차선의 교차점 x 좌표를 계산하여
-    중심과 비교해 좌회전, 우회전, 직진 판단
-    """
-    if left_line is None or right_line is None:
-        return "stop"
-
-    left_slope, left_intercept = left_line
-    right_slope, right_intercept = right_line
-
-    # 두 직선의 교차점 x 좌표 공식
-    x_intersect = (right_intercept - left_intercept) / (left_slope - right_slope)
-
-    center = img_width / 2
-    threshold = 20  # 중심 허용 범위
-
-    if x_intersect < center - threshold:
-        return "left"
-    elif x_intersect > center + threshold:
+# 차선 중앙이 이미지 중앙보다 좌/우에 있는지에 따라 방향 결정
+def decide_direction(center_lane_x, img_center, threshold=15):
+    diff = center_lane_x - img_center
+    if abs(diff) < threshold:
+        return "straight"
+    elif diff > 0:
         return "right"
     else:
-        return "straight"
+        return "left"
 
-# ========================
-# 차선 선 그리기 함수
-# ========================
-def draw_lines(img, left_line, right_line):
-    """
-    영상에 좌우 차선을 그리고,
-    차선 사이를 반투명으로 채운다.
-    """
-    line_img = np.zeros_like(img)
-
-    height = img.shape[0]
-    y1 = height
-    y2 = int(height * 0.6)
-
-    if left_line is not None:
-        left_pts = make_line_points(y1, y2, left_line[0], left_line[1])
-        cv2.line(line_img, (left_pts[0], left_pts[1]), (left_pts[2], left_pts[3]), (0, 255, 255), 5)
-
-    if right_line is not None:
-        right_pts = make_line_points(y1, y2, right_line[0], right_line[1])
-        cv2.line(line_img, (right_pts[0], right_pts[1]), (right_pts[2], right_pts[3]), (0, 255, 255), 5)
-
-    # 좌우 차선 사이를 다각형으로 채우기 (반투명)
-    if left_line is not None and right_line is not None:
-        pts = np.array([
-            [left_pts[0], left_pts[1]],
-            [left_pts[2], left_pts[3]],
-            [right_pts[2], right_pts[3]],
-            [right_pts[0], right_pts[1]]
-        ])
-        cv2.fillPoly(line_img, [pts], (0, 230, 30))
-
-    # 원본 영상과 합성
-    combined = cv2.addWeighted(img, 0.7, line_img, 0.3, 0)
-    return combined
-
-# ========================
-# 메인 함수
-# ========================
+# 메인 함수: 카메라로 영상 받아서 차선 인식 및 차량 제어
 def main():
-    # PiCamera2 객체 생성 및 설정
+    # 카메라 설정
     picam2 = Picamera2()
-    config = picam2.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
+    config = picam2.create_preview_configuration(main={"format": "BGR888", "size": (640, 480)})
     picam2.configure(config)
     picam2.start()
 
-    # 차 컨트롤러 객체 생성
+    # 차량 제어 인스턴스 생성
     car = CarController()
 
     try:
         while True:
-            # 프레임 캡처
-            frame = picam2.capture_array()
+            frame = picam2.capture_array()  # 프레임 캡처
 
-            # 흰색 테이프 필터링
-            filtered = filter_white_tape(frame)
+            height, width = frame.shape[:2]
+            img_center = width // 2
 
-            # 그레이스케일 변환 (엣지 검출 전 단계)
-            gray = cv2.cvtColor(filtered,
+            filtered = filter_white(frame)  # 흰색 차선 필터링
+            gray = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)  # 그레이스케일 변환
+            edges = cv2.Canny(gray, 50, 150)  # 엣지 검출
+            masked = region_of_interest(edges)  # ROI 마스킹
+
+            # 허프 직선 변환으로 차선 후보 찾기
+            lines = cv2.HoughLinesP(masked, 1, np.pi/180, threshold=30, minLineLength=40, maxLineGap=20)
+
+            # 차선 좌/우 분리
+            left_points, right_points = separate_lines(lines, img_center)
+
+            # 각각 선형 회귀
+            left_fit = fit_line(left_points)
+            right_fit = fit_line(right_points)
+
+            y1 = height
+            y2 = int(height * 0.6)
+
+            if left_fit is not None and right_fit is not None:
+                # 양쪽 차선이 검출된 경우
+                left_slope, left_intercept = left_fit
+                right_slope, right_intercept = right_fit
+
+                left_line = make_line_points(y1, y2, left_slope, left_intercept)
+                right_line = make_line_points(y1, y2, right_slope, right_intercept)
+
+                if left_line and right_line:
+                    # 양쪽 직선에서 중심 x 좌표 계산
+                    center_lane_x = (left_line[0][0] + right_line[0][0]) // 2
+
+                    # 차선 영역 시각화 (초록색 투명 다각형)
+                    pts = np.array([left_line[0], left_line[1], right_line[1], right_line[0]])
+                    overlay = frame.copy()
+                    cv2.fillPoly(overlay, [pts], (0, 255, 0))
+                    frame = cv2.addWeighted(overlay, 0.3, frame, 0.7, 0)
+
+                    # 실제 차선 선 그리기
+                    cv2.line(frame, left_line[0], left_line[1], (0, 255, 255), 5)
+                    cv2.line(frame, right_line[0], right_line[1], (0, 255, 255), 5)
+
+                    # 주행 방향 결정
+                    direction = decide_direction(center_lane_x, img_center)
+
+                    if direction == "straight":
+                        car.update(direction=None)  # 방향 조향 정지
+                    else:
+                        car.update(direction=direction)  # 좌/우 조향
+
+                    cv2.putText(frame, f"Direction: {direction}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+
+                else:
+                    # 차선을 인식하지 못한 경우
+                    car.stop_drive()
+                    cv2.putText(frame, "No lane detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+            else:
+                # 양쪽 차선 중 하나라도 검출 실패 시
+                car.stop_drive()
+                cv2.putText(frame, "No lane detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+
+            # 결과 영상 출력
+            cv2.imshow("Lane Detection", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    except KeyboardInterrupt:
+        pass
+
+    finally:
+        car.stop_drive()  # 종료 시 차량 정지
+        picam2.stop()     # 카메라 종료
+        cv2.destroyAllWindows()  # 창 닫기
+
+# 프로그램 시작점
+if __name__ == "__main__":
+    main()
