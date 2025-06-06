@@ -10,14 +10,14 @@ from picamera2 import Picamera2
 from car_controller import CarController
 
 # 관심 영역 설정 비율 (차선 검출에 사용할 하단 다각형 ROI 범위 설정용)
-POLY_BOTTOM_WIDTH = 0.9  # 이미지 하단의 ROI 너비 비율
-POLY_TOP_WIDTH = 0.2     # 이미지 상단의 ROI 너비 비율
+POLY_BOTTOM_WIDTH = 1.5  # 이미지 하단의 ROI 너비 비율
+POLY_TOP_WIDTH = 0.3     # 이미지 상단의 ROI 너비 비율
 POLY_HEIGHT = 0.6        # 이미지에서 ROI의 높이 비율
 
 # 흰색 필터링 함수 (차선이 흰색일 경우 유용)
 def filter_white(img):
     """흰색 영역만 추출하는 필터링 함수"""
-    lower = np.array([200, 200, 200])  # BGR 흰색 하한
+    lower = np.array([160, 160, 160])  # BGR 흰색 하한
     upper = np.array([255, 255, 255])  # BGR 흰색 상한
     mask = cv2.inRange(img, lower, upper)  # 범위에 해당하는 부분만 추출
     return cv2.bitwise_and(img, img, mask=mask)  # 원본 이미지에서 흰색 부분만 남김
@@ -25,7 +25,7 @@ def filter_white(img):
 # 관심 영역(ROI)을 적용하여 하단 차선 부분만 남기는 함수
 def region_of_interest(img):
     height, width = img.shape[:2]  # 이미지 높이와 너비 가져오기
-    mask = np.zeros_like(img[:,:,0])  # 마스크는 그레이스케일 형식 (초기값 0)
+    mask = np.zeros_like(img)  # 마스크는 그레이스케일 형식 (초기값 0)
 
     # ROI 다각형 좌표 계산
     polygon = np.array([[  
@@ -37,7 +37,7 @@ def region_of_interest(img):
 
     # ROI 영역 마스크에 흰색 채우기
     cv2.fillPoly(mask, polygon, 255)
-    masked_img = cv2.bitwise_and(img, img, mask=mask)  # ROI 바깥은 제거
+    masked_img = cv2.bitwise_and(img,mask)  # ROI 바깥은 제거
     return masked_img
 
 # 허프 직선 결과를 좌우 차선으로 분리하는 함수
@@ -87,15 +87,16 @@ def make_line_points(y1, y2, slope, intercept):
     return (x1, int(y1)), (x2, int(y2))
 
 # 차선 중앙이 이미지 중앙보다 좌/우에 있는지에 따라 방향 결정
-def decide_direction(center_lane_x, img_center, threshold=15):
+def decide_direction(center_lane_x, img_center,left_slope,right_slope,
+position_thresh=30, slope_thresh=0.6,slope_diff_thresh=0.5):
+    
     diff = center_lane_x - img_center
-    if abs(diff) < threshold:
-        return "straight"
-    elif diff > 0:
-        return "right"
-    else:
-        return "left"
-
+    
+    if abs(diff) > position_thresh and abs(left_slope) > slope_thresh and abs(right_slope) > slope_thresh and abs(left_slope - right_slope) > slope_diff_thresh:
+  
+        return "right" if diff > 0 else "left"
+    return "straight"
+    
 # 메인 함수: 카메라로 영상 받아서 차선 인식 및 차량 제어
 def main():
     # 카메라 설정
@@ -116,7 +117,7 @@ def main():
 
             filtered = filter_white(frame)  # 흰색 차선 필터링
             gray = cv2.cvtColor(filtered, cv2.COLOR_BGR2GRAY)  # 그레이스케일 변환
-            edges = cv2.Canny(gray, 50, 150)  # 엣지 검출
+            edges = cv2.Canny(gray, 50, 120)  # 엣지 검출
             masked = region_of_interest(edges)  # ROI 마스킹
 
             # 허프 직선 변환으로 차선 후보 찾기
@@ -155,12 +156,18 @@ def main():
                     cv2.line(frame, right_line[0], right_line[1], (0, 255, 255), 5)
 
                     # 주행 방향 결정
-                    direction = decide_direction(center_lane_x, img_center)
+                    direction = decide_direction(center_lane_x, img_center,left_slope,right_slope)
 
                     if direction == "straight":
-                        car.update(direction=None)  # 방향 조향 정지
+                        car.update(direction=None)
+                        car.set_motor_forward()         # 방향 조향 정지
+                    if direction == "right":
+                        car.update(direction="right")
+                    if direction == "left":
+                        car.update(direction="left")
                     else:
-                        car.update(direction=direction)  # 좌/우 조향
+                        car.update(direction=None)
+                                                        # 완전정지
 
                     cv2.putText(frame, f"Direction: {direction}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
 
@@ -175,6 +182,8 @@ def main():
 
             # 결과 영상 출력
             cv2.imshow("Lane Detection", frame)
+            
+            
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
