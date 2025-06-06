@@ -88,7 +88,7 @@ def make_line_points(y1, y2, slope, intercept):
 
 # 차선 중앙이 이미지 중앙보다 좌/우에 있는지에 따라 방향 결정
 def decide_direction(center_lane_x, img_center,left_slope,right_slope,
-position_thresh=30,slope_diff_thresh=0.5):
+position_thresh=30,slope_thresh=0.5):
     
     diff = center_lane_x - img_center
     
