@@ -4,7 +4,7 @@ import time
 from picamera2 import Picamera2
 from car_controller import CarController
 
-# 관심영역(ROI) 설정 함수: 이미지 하단 40% 영역만 사용
+# 관심영역(ROI) 설정 함수: 이미지 하단 50% 영역만 사용
 def region_of_interest(img):
     height, width = img.shape
     mask = np.zeros_like(img)
