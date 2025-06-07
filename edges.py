@@ -78,14 +78,14 @@ def main():
 
             elif abs(offset) < threshold:
                 if abs(left_count - right_count) > 1000:
-                    direction = "left" if left_count > right_count else "right"
+                    direction = "right" if left_count > right_count else "left"
                 else:
                     direction = "straight"
                 car.update(direction if direction != "straight" else None)
                 car.set_motor_forward()
 
             else:
-                direction = "left" if offset < -threshold else "right"
+                direction = "right" if offset < -threshold else "left"
                 car.update(direction)
                 car.set_motor_forward()
 
