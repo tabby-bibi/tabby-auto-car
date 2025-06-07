@@ -50,11 +50,11 @@ class CarController:
         if direction == "left":
             GPIO.output(self.IN3, GPIO.HIGH)
             GPIO.output(self.IN4, GPIO.LOW)
-            self.drive_pwm.ChangeDutyCycle(20)
+            self.drive_pwm.ChangeDutyCycle(38)
         elif direction == "right":
             GPIO.output(self.IN3, GPIO.LOW)
             GPIO.output(self.IN4, GPIO.HIGH)
-            self.drive_pwm.ChangeDutyCycle(20)
+            self.drive_pwm.ChangeDutyCycle(38)
         else:
             self.stop_steer()
             return
