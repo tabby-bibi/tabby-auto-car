@@ -127,12 +127,13 @@ def main():
                     if direction == "straight":
                         car.update(direction=None)
                         car.set_motor_forward()
+                        
                     elif direction == "left":
                         car.update(direction="left")
-                        car.set_motor_forward()
+                        
                     elif direction == "right":
                         car.update(direction="right")
-                        car.set_motor_forward()
+                        
                     else:
                         car.update(direction=None)
                         car.stop_drive()
