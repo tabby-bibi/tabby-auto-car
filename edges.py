@@ -38,7 +38,7 @@ def main():
             # 전처리
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             blur = cv2.GaussianBlur(gray, (5, 5), 0)
-            edges = cv2.Canny(blur, 30, 120)  # ✅ Canny 감도 조정
+            edges = cv2.Canny(blur, 30, 120)  # Canny 엣지 감도 조정
 
             roi = region_of_interest(edges)
 
@@ -46,53 +46,50 @@ def main():
             left_roi = roi[:, :img_center]
             right_roi = roi[:, img_center:]
 
-            # 각 영역의 엣지 수 계산
+            # 각 영역 엣지 수 계산
             left_count = cv2.countNonZero(left_roi)
             right_count = cv2.countNonZero(right_roi)
 
-            # 좌우 히스토그램 각각 계산
+            # 좌우 히스토그램 계산
             left_hist = compute_histogram(left_roi)
             right_hist = compute_histogram(right_roi)
 
             if np.max(left_hist) > 0 and np.max(right_hist) > 0:
-                # ✅ 좌우 중심이 모두 있을 경우 평균으로 중심 계산
                 left_center = np.argmax(left_hist)
                 right_center = np.argmax(right_hist) + img_center
                 lane_center = (left_center + right_center) // 2
             else:
-                # 한쪽 차선만 인식되면 전체 히스토그램 사용
                 full_hist = compute_histogram(roi)
                 lane_center = np.argmax(full_hist)
 
             offset = lane_center - img_center
             threshold = 30
 
-            # ========================
-            # 회전 방향 판단 로직
-            # ========================
-
+            # 회전 방향 판단 및 모터 제어
             if left_count == 0 and right_count == 0:
                 direction = "stop"
-                car.update(direction=None)
-                car.stop_drive()
+                car.update(direction=None)  # 조향 모터 정지
+                car.stop_drive()            # 주행 모터 정지
 
             elif abs(offset) < threshold:
                 if abs(left_count - right_count) > 1000:
                     direction = "right" if left_count > right_count else "left"
                 else:
                     direction = "straight"
-                car.update(direction if direction != "straight" else None)
-                car.set_motor_forward()
+
+                if direction == "straight":
+                    car.update(direction=None)  # 조향 모터 정지
+                    car.set_motor_forward()     # 주행 모터 전진
+                else:
+                    car.update(direction)       # 좌/우 조향 모터 동작
+                    car.set_motor_forward()     # 주행 모터 전진
 
             else:
                 direction = "right" if offset < -threshold else "left"
-                car.update(direction)
-                car.set_motor_forward()
+                car.update(direction)           # 좌/우 조향 모터 동작
+                car.set_motor_forward()         # 주행 모터 전진
 
-            # ========================
             # 시각화
-            # ========================
-
             cv2.putText(frame, f"Direction: {direction}", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
             cv2.line(frame, (lane_center, height), (lane_center, int(height * 0.6)), (255, 0, 0), 2)
