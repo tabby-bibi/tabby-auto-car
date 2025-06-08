@@ -63,7 +63,7 @@ def main():
                 lane_center = np.argmax(full_hist)
 
             offset = lane_center - img_center
-            threshold = 30
+            threshold = 50
 
             # 회전 방향 판단 및 모터 제어
             if left_count == 0 and right_count == 0:
@@ -72,7 +72,7 @@ def main():
                 car.stop_drive()            # 주행 모터 정지
 
             elif abs(offset) < threshold:
-                if abs(left_count - right_count) > 1000:
+                if abs(left_count - right_count) > 4000:
                     direction = "right" if left_count > right_count else "left"
                 else:
                     direction = "straight"
@@ -82,12 +82,12 @@ def main():
                     car.set_motor_forward()     # 주행 모터 전진
                 else:
                     car.update(direction)       # 좌/우 조향 모터 동작
-                    car.set_motor_forward()     # 주행 모터 전진
+                    
 
             else:
                 direction = "right" if offset < -threshold else "left"
                 car.update(direction)           # 좌/우 조향 모터 동작
-                car.set_motor_forward()         # 주행 모터 전진
+                     
 
             # 시각화
             cv2.putText(frame, f"Direction: {direction}", (10, 30),
