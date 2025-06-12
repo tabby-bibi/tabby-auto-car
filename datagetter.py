@@ -1,19 +1,12 @@
-# RC카를 직접 운전하여 이미지 데이터를 저장하는 코드
-
-
 import os
 import cv2
 import numpy as np
-import pigpio
 import csv
 import time
-import sys
-import termios
-import tty
-import select
+import pigpio
 from picamera2 import Picamera2
 
-# 서보 & 모터 제어 핀 정의
+# 핀 정의
 SERVO_PIN = 18
 IN1 = 12
 IN2 = 13
@@ -21,10 +14,13 @@ IN2 = 13
 # pigpio 초기화
 pi = pigpio.pi()
 
+# 서보 제어 함수
 def set_servo_angle(angle):
     pulsewidth = int(500 + (angle / 180.0) * 2000)
+    pulsewidth = max(500, min(2500, pulsewidth))
     pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
+# 모터 제어 함수
 def motor_forward():
     pi.write(IN1, 1)
     pi.write(IN2, 0)
@@ -37,60 +33,53 @@ def motor_stop():
     pi.write(IN1, 0)
     pi.write(IN2, 0)
 
-def getkey():
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    return ch
-
-# Picamera2 설정
+# 카메라 설정
 picam2 = Picamera2()
 picam2.configure(picam2.create_preview_configuration(main={"size": (320, 240)}))
 picam2.start()
 time.sleep(2)
 
-# 디렉토리 생성
+# 디렉토리 및 CSV
 os.makedirs("data", exist_ok=True)
-
-# CSV 저장 준비
 csv_file = open('data/drive_log.csv', mode='w', newline='')
 csv_writer = csv.writer(csv_file)
 csv_writer.writerow(['frame', 'steering_angle', 'throttle'])
 
+# 초기값
 frame_count = 0
-steering_angle = 90
-throttle = 0
+steering_angle = 90  # 직진
+throttle = 0         # 1: 전진, -1: 후진, 0: 정지
+
+print("↑: 전진, ↓: 후진, ←: 좌회전, →: 우회전, space: 정지, q: 종료")
 
 try:
-    print("W: 전진, S: 후진, A: 좌회전, D: 우회전, Q: 종료")
-
     while True:
         frame = picam2.capture_array()
 
-        key = None
-        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-            key = getkey().lower()
+        key = cv2.waitKey(1) & 0xFF
 
-        if key == 'w':
+        # 방향키 처리
+        if key == ord('q'):
+            break
+        elif key == 82:  # ↑
             throttle = 1
-            motor_forward()
-        elif key == 's':
+        elif key == 84:  # ↓
             throttle = -1
-            motor_backward()
-        elif key == 'a':
+        elif key == 32:  # spacebar
+            throttle = 0
+        elif key == 81:  # ←
             steering_angle = max(0, steering_angle - 5)
             set_servo_angle(steering_angle)
-        elif key == 'd':
+        elif key == 83:  # →
             steering_angle = min(180, steering_angle + 5)
             set_servo_angle(steering_angle)
-        elif key == 'q':
-            break
+
+        # 모터 동작 지속
+        if throttle == 1:
+            motor_forward()
+        elif throttle == -1:
+            motor_backward()
         else:
-            throttle = 0
             motor_stop()
 
         # 프레임 저장
@@ -101,10 +90,8 @@ try:
         csv_writer.writerow([frame_count, steering_angle, throttle])
         frame_count += 1
 
-        # 화면에 표시 (선택사항)
+        # 화면 출력
         cv2.imshow("Driving", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
 
 finally:
     csv_file.close()
@@ -112,4 +99,3 @@ finally:
     pi.set_servo_pulsewidth(SERVO_PIN, 0)
     pi.stop()
     cv2.destroyAllWindows()
-
