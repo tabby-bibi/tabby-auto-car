@@ -1,3 +1,6 @@
+# RC카를 직접 운전하여 이미지 데이터를 저장하는 코드
+
+
 import cv2
 import numpy as np
 import pigpio
