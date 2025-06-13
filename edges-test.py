@@ -3,9 +3,10 @@ import numpy as np
 import time
 from picamera2 import Picamera2
 from car_controller import CarController
+import matplotlib.pyplot as plt
 
 
-# 관심영역(ROI) 설정 함수: 이미지 하단 50% 영역만 사용
+# 관심영역(ROI) 설정 함수
 def region_of_interest(img):
     height, width = img.shape
     mask = np.zeros_like(img)
@@ -23,23 +24,38 @@ def region_of_interest(img):
 def compute_histogram(img):
     return np.sum(img, axis=0)
 
+
+# 히스토그램을 시각화해서 이미지로 보여주는 함수
+def draw_histogram(hist):
+    hist_img = np.zeros((200, 640, 3), dtype=np.uint8)
+    max_val = np.max(hist)
+    if max_val == 0:
+        return hist_img
+
+    hist_norm = (hist / max_val) * 200  # 정규화
+    for x in range(len(hist)):
+        cv2.line(hist_img, (x, 200), (x, 200 - int(hist_norm[x])), (255, 255, 255), 1)
+    return hist_img
+
+
 def main():
     picam2 = Picamera2()
-    config = picam2.create_preview_configuration(main={"format": "BGR888", "size": (640, 480)})
+    config = picam2.create_preview_configuration(
+        main={"format": "BGR888", "size": (640, 480)},
+        controls={"FrameRate": 15}
+    )
     picam2.configure(config)
 
-    # ⬇️ 자동 노출 / 화이트밸런스 해제 및 수동 설정
     picam2.set_controls({
         "AwbEnable": False,
         "AeEnable": False,
-        "ExposureTime": 10000,  # 마이크로초 단위 (예: 10000 = 10ms)
-        "AnalogueGain": 1.0,  # 밝기 증가 (1.0~4.0)
-        "ColourGains": (1.5, 1.5)  # RGB 색 보정 (G를 줄이고 색감을 맞춤)
+        "ExposureTime": 10000,       # 10ms
+        "AnalogueGain": 1.0,
+        "ColourGains": (1.5, 1.5)
     })
 
     picam2.start()
     car = CarController()
-    frame_count = 0
 
     try:
         while True:
@@ -59,16 +75,14 @@ def main():
             roi = region_of_interest(edges)
             print("ROI extracted")
 
-            # 좌우 영역 나누기
+            # 좌우 나누기
             left_roi = roi[:, :img_center]
             right_roi = roi[:, img_center:]
 
-            # 엣지 수 계산
             left_count = cv2.countNonZero(left_roi)
             right_count = cv2.countNonZero(right_roi)
             print(f"Left edge count: {left_count}, Right edge count: {right_count}")
 
-            # 히스토그램 계산
             left_hist = compute_histogram(left_roi)
             right_hist = compute_histogram(right_roi)
 
@@ -85,9 +99,7 @@ def main():
             offset = lane_center - img_center
             print(f"Image center: {img_center}, Offset: {offset}")
 
-            threshold = 50
-
-            # 주행 판단 및 모터 제어
+            threshold = 30
             if left_count == 0 and right_count == 0:
                 print("No lane detected. Stopping.")
                 direction = "stop"
@@ -97,7 +109,7 @@ def main():
             elif abs(offset) < threshold:
                 if abs(left_count - right_count) > 4000:
                     direction = "right" if left_count > right_count else "left"
-                    print(f"Offset small, but unbalanced counts. Adjusting {direction}.")
+                    print(f"Offset small, but edge imbalance. Adjusting {direction}.")
                 else:
                     direction = "straight"
                     print("Going straight.")
