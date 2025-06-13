@@ -3,7 +3,6 @@ import numpy as np
 import time
 from picamera2 import Picamera2
 from car_controller import CarController
-import matplotlib.pyplot as plt
 
 
 # 관심영역(ROI) 설정 함수: 이미지 하단 50% 영역만 사용
@@ -23,19 +22,6 @@ def region_of_interest(img):
 # 히스토그램 계산 함수
 def compute_histogram(img):
     return np.sum(img, axis=0)
-
-
-# 히스토그램 시각화 함수 (필요시 사용)
-def show_histogram(hist, title="Histogram"):
-    plt.figure(figsize=(6, 3))
-    plt.title(title)
-    plt.xlabel("Pixel Position (X)")
-    plt.ylabel("Edge Intensity")
-    plt.plot(hist, color='blue')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
 
 def main():
     picam2 = Picamera2()
@@ -136,11 +122,6 @@ def main():
             cv2.imshow("Lane Tracking", frame)
             cv2.imshow("ROI Edge", roi)
 
-            # 히스토그램 시각화 (매 30프레임마다)
-            if frame_count % 30 == 0:
-                show_histogram(left_hist, "Left Histogram")
-                show_histogram(right_hist, "Right Histogram")
-            frame_count += 1
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
