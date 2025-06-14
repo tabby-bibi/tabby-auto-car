@@ -1,108 +1,90 @@
 # RC카 모드로 직접 조향이 가능 하게 해주는 코드
 
-import RPi.GPIO as GPIO
-import pygame
-import sys
+import pigpio
 import time
-from pygame.locals import *
+import sys
+import termios
+import tty
 
-# 핀 번호
-IN1 = 19  # 후륜 구동
+# 핀 번호 설정
+SERVO_PIN = 18   # 서보모터 (조향)
+IN1 = 12         # DC 모터 제어
 IN2 = 13
-ENA = 26
 
-IN3 = 6   # 조향 모터 
-IN4 = 5   # 앞바퀴
-ENB = 21
+# pigpio 초기화
+pi = pigpio.pi()
+pi.set_mode(IN1, pigpio.OUTPUT)
+pi.set_mode(IN2, pigpio.OUTPUT)
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
+# 서보 각도 설정 함수 (0~180도)
+def set_servo_angle(angle):
+    angle = max(0, min(180, angle))
+    pulsewidth = 500 + (angle / 180.0) * 2000  # 500~2500us
+    pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
-pins = [IN1, IN2, ENA, IN3, IN4, ENB]
-for pin in pins:
-    GPIO.setup(pin, GPIO.OUT)
+# DC 모터 제어 함수
+def motor_forward():
+    pi.write(IN1, 1)
+    pi.write(IN2, 0)
 
-pwm_drive = GPIO.PWM(ENA, 100)
-pwm_steer = GPIO.PWM(ENB, 100)
-pwm_drive.start(0)
-pwm_steer.start(0)
+def motor_backward():
+    pi.write(IN1, 0)
+    pi.write(IN2, 1)
 
-# 구동 함수
-def forward(speed=70):
-    GPIO.output(IN1, GPIO.HIGH)
-    GPIO.output(IN2, GPIO.LOW)
-    pwm_drive.ChangeDutyCycle(speed)
+def motor_stop():
+    pi.write(IN1, 0)
+    pi.write(IN2, 0)
 
-# 후진 코드
-def reverse(speed=70): 
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.HIGH)
-    pwm_drive.ChangeDutyCycle(speed)
+# 키보드 입력 받는 함수
+def getkey():
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    return ch
 
-# 좌회전 코드
-def steer_left(duration=0.4, speed=70): 
-    GPIO.output(IN3, GPIO.HIGH)
-    GPIO.output(IN4, GPIO.LOW)
-    pwm_steer.ChangeDutyCycle(speed)
-    time.sleep(duration)
-    pwm_steer.ChangeDutyCycle(0)  # 정지
+# 초기 상태
+steering_angle = 90  # 중립
 
-# 우회전 코드
-def steer_right(duration=0.4, speed=70):
-    GPIO.output(IN3, GPIO.LOW)
-    GPIO.output(IN4, GPIO.HIGH)
-    pwm_steer.ChangeDutyCycle(speed)
-    time.sleep(duration)
-    pwm_steer.ChangeDutyCycle(0)  # 정지
+print("조작 키 안내:")
+print(" W : 전진")
+print(" S : 후진")
+print(" A : 좌회전")
+print(" D : 우회전")
+print(" Q : 종료")
 
-# 정지 코드
-def stop_all():
-    pwm_drive.ChangeDutyCycle(0)
-    pwm_steer.ChangeDutyCycle(0)
-    for pin in [IN1, IN2, IN3, IN4]:
-        GPIO.output(pin, GPIO.LOW)
+set_servo_angle(steering_angle)
+motor_stop()
 
-# Pygame 초기화
-pygame.init()
-screen = pygame.display.set_mode((640, 480))
-pygame.display.set_caption("DC 조향 차량")
-pygame.mouse.set_visible(0)
-
-# 실행 코드 루프문
 try:
-    print("↑: 전진 / ↓: 후진 / ←: 좌조향 / →: 우조향 / Space: 정지")
     while True:
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                pygame.quit()
-                GPIO.cleanup()
-                sys.exit()
+        key = getkey().lower()
 
-            if event.type == KEYDOWN:
-                
-                if event.key == K_UP:
-                    print("전진")
-                    forward()
-                if event.key == K_DOWN:
-                    print("후진")
-                    reverse()
-                if event.key == K_LEFT:
-                    print("좌회전")
-                    steer_left()
-                if event.key == K_RIGHT:
-                    print("우회전")
-                    steer_right()
-                if event.key == K_SPACE:
-                    print("정지")
-                    stop_all()
-
-except KeyboardInterrupt:
-    print("\n종료됨")
-
+        if key == 'w':
+            motor_forward()
+            print("전진")
+        elif key == 's':
+            motor_backward()
+            print("후진")
+        elif key == 'a':
+            steering_angle = max(40, steering_angle - 10)
+            set_servo_angle(steering_angle)
+            print(f"좌회전: {steering_angle}도")
+        elif key == 'd':
+            steering_angle = min(140, steering_angle + 10)
+            set_servo_angle(steering_angle)
+            print(f"우회전: {steering_angle}도")
+        elif key == 'q':
+            print("종료")
+            break
+        else:
+            motor_stop()
+            print("정지")
 
 finally:
-    stop_all()
-    pwm_drive.stop()
-    pwm_steer.stop()
-    GPIO.cleanup()
-    pygame.quit()
+    motor_stop()
+    pi.set_servo_pulsewidth(SERVO_PIN, 0)
+    pi.stop()
