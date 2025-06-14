@@ -44,8 +44,8 @@ def getkey():
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        ch1 = sys.stdin.read(1)
-        if ch1 == '\x1b':
+        ch = sys.stdin.read(1).lower()
+        if ch == '\x1b':  # 방향키
             ch2 = sys.stdin.read(1)
             ch3 = sys.stdin.read(1)
             if ch2 == '[':
@@ -58,8 +58,10 @@ def getkey():
                 elif ch3 == 'D':
                     return 'left'
             return ''
+        elif ch in ['w', 's', 'a', 'd', 'q']:
+            return {'w': 'up', 's': 'down', 'a': 'left', 'd': 'right', 'q': 'q'}[ch]
         else:
-            return ch1.lower()
+            return ''
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
