@@ -1,37 +1,41 @@
 from picamera2 import Picamera2
 import cv2
 import numpy as np
+
 '''
-엣지 기반 그리드 차선 인식 코드 명암 개선1 : 히스토그램 평활화 
+Edge-based grid lane detection with brightness enhancement using histogram equalization.
 '''
-# PiCamera2 초기화 (최신 방식 사용)
+
+# Initialize PiCamera2 (modern usage)
 picam2 = Picamera2()
 config = picam2.create_preview_configuration(main={"size": (640, 480), "format": "RGB888"})
 picam2.configure(config)
 picam2.start()
 
+# Determine direction based on lane center position
 def get_direction_text(lane_center, frame_width, threshold=40):
     center_x = frame_width // 2
     diff = lane_center - center_x
 
     if abs(diff) < threshold:
-        return "직진"
+        return "Straight"
     elif diff < 0:
-        return "좌회전"
+        return "Left"
     else:
-        return "우회전"
+        return "Right"
 
+# Frame processing function
 def process_frame(frame):
     height, width = frame.shape[:2]
 
-    # 전처리
+    # Preprocessing
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    # 히스토그램 평활화 - 추가된 부분
+    # Histogram Equalization - Added for brightness enhancement
     equalized = cv2.equalizeHist(gray)
     blur = cv2.GaussianBlur(equalized, (5, 5), 0)
     edges = cv2.Canny(blur, 50, 150)
 
-    # 그리드 파라미터
+    # Grid parameters
     n_rows = 10
     n_cols = 2
     grid_height = height // n_rows
@@ -56,33 +60,33 @@ def process_frame(frame):
                 cv2.line(frame, pt1, pt2, color, 2)
                 lane_centers.append(x1 + mean_x)
 
-            # 그리드 시각화
+            # Draw grid rectangles
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
 
-    # 차선 중심 → 방향 판단
+    # Determine direction from lane centers
     if lane_centers:
         lane_center = int(np.mean(lane_centers))
         cv2.line(frame, (lane_center, height), (lane_center, height - 50), (0, 255, 255), 3)
         direction = get_direction_text(lane_center, width)
-        cv2.putText(frame, f"방향: {direction}", (30, 60),
+        cv2.putText(frame, f"Direction: {direction}", (30, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
     else:
-        cv2.putText(frame, "차선을 찾을 수 없음", (30, 60),
+        cv2.putText(frame, "No lane detected", (30, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
 
     return frame
 
-# 실시간 처리 루프
+# Real-time frame loop
 try:
     while True:
         frame = picam2.capture_array()
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # RGB → BGR 변환
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert RGB to BGR
         result = process_frame(frame)
         cv2.imshow("Lane Detection", result)
         if cv2.waitKey(1) == ord('q'):
             break
 except KeyboardInterrupt:
-    print("사용자에 의해 중단되었습니다.")
+    print("Interrupted by user.")
 finally:
     picam2.close()
     cv2.destroyAllWindows()
