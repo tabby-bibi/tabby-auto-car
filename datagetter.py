@@ -1,12 +1,15 @@
-import os
 import cv2
 import numpy as np
+import pigpio
 import csv
 import time
-import pigpio
-from picamera2 import Picamera2
+import os
+import sys
+import termios
+import tty
+import select
 
-# 핀 정의
+# 서보 & 모터 제어 핀 정의
 SERVO_PIN = 18
 IN1 = 12
 IN2 = 13
@@ -14,13 +17,12 @@ IN2 = 13
 # pigpio 초기화
 pi = pigpio.pi()
 
-# 서보 제어 함수
+# 서보 각도 설정 함수
 def set_servo_angle(angle):
-    pulsewidth = int(500 + (angle / 180.0) * 2000)
-    pulsewidth = max(500, min(2500, pulsewidth))
+    pulsewidth = int(500 + (angle / 180.0) * 2000)  # 500~2500us
     pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
-# 모터 제어 함수
+# DC 모터 제어
 def motor_forward():
     pi.write(IN1, 1)
     pi.write(IN2, 0)
@@ -33,69 +35,104 @@ def motor_stop():
     pi.write(IN1, 0)
     pi.write(IN2, 0)
 
-# 카메라 설정
-picam2 = Picamera2()
-picam2.configure(picam2.create_preview_configuration(main={"size": (320, 240)}))
-picam2.start()
-time.sleep(2)
+# 키보드 입력 처리 (방향키 대응)
+def getkey():
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch1 = sys.stdin.read(1)
+        if ch1 == '\x1b':  # 방향키는 ESC [ A/B/C/D 시퀀스로 시작
+            ch2 = sys.stdin.read(1)
+            ch3 = sys.stdin.read(1)
+            if ch2 == '[':
+                if ch3 == 'A':
+                    return 'up'
+                elif ch3 == 'B':
+                    return 'down'
+                elif ch3 == 'C':
+                    return 'right'
+                elif ch3 == 'D':
+                    return 'left'
+            return ''
+        else:
+            return ch1.lower()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
-# 디렉토리 및 CSV
-os.makedirs("data", exist_ok=True)
+# 저장 디렉토리
+os.makedirs('data', exist_ok=True)
+
+# 영상 캡처 초기화
+cap = cv2.VideoCapture(0)
+
+# CSV 저장
 csv_file = open('data/drive_log.csv', mode='w', newline='')
 csv_writer = csv.writer(csv_file)
 csv_writer.writerow(['frame', 'steering_angle', 'throttle'])
 
-# 초기값
 frame_count = 0
-steering_angle = 90  # 직진
-throttle = 0         # 1: 전진, -1: 후진, 0: 정지
-
-print("↑: 전진, ↓: 후진, ←: 좌회전, →: 우회전, space: 정지, q: 종료")
+steering_angle = 90  # 중립
+throttle = 0         # 정지
 
 try:
+    print("↑: 전진, ↓: 후진, ←: 좌회전, →: 우회전, Q: 종료")
+
     while True:
-        frame = picam2.capture_array()
-
-        key = cv2.waitKey(1) & 0xFF
-
-        # 방향키 처리
-        if key == ord('q'):
+        ret, frame = cap.read()
+        if not ret:
             break
-        elif key == 82:  # ↑
-            throttle = 1
-        elif key == 84:  # ↓
-            throttle = -1
-        elif key == 32:  # spacebar
-            throttle = 0
-        elif key == 81:  # ←
-            steering_angle = max(0, steering_angle - 5)
-            set_servo_angle(steering_angle)
-        elif key == 83:  # →
-            steering_angle = min(180, steering_angle + 5)
-            set_servo_angle(steering_angle)
 
-        # 모터 동작 지속
-        if throttle == 1:
+        key = None
+        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+            key = getkey()
+
+        # 방향키 입력 처리
+        if key == 'up':
+            steering_angle = 90
+            set_servo_angle(steering_angle)
+            throttle = 40
             motor_forward()
-        elif throttle == -1:
+        elif key == 'down':
+            throttle = -40
             motor_backward()
+        elif key == 'left':
+            steering_angle = max(0, steering_angle - 10)
+            set_servo_angle(steering_angle)
+        elif key == 'right':
+            steering_angle = min(180, steering_angle + 10)
+            set_servo_angle(steering_angle)
+        elif key == 'q':
+            break
         else:
+            throttle = 0
             motor_stop()
 
-        # 프레임 저장
-        filename = f'data/frame_{frame_count:05d}.jpg'
+        # 방향 문자열 (이미지 저장용)
+        if steering_angle < 80:
+            direction = "left"
+        elif steering_angle > 100:
+            direction = "right"
+        else:
+            direction = "straight"
+
+        # 이미지 저장
+        filename = f"data/frame_{frame_count:05d}_{direction}.jpg"
         cv2.imwrite(filename, frame)
 
-        # CSV 기록
+        # CSV 저장
         csv_writer.writerow([frame_count, steering_angle, throttle])
         frame_count += 1
 
-        # 화면 출력
+        # 화면 표시
         cv2.imshow("Driving", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
 finally:
     csv_file.close()
+    cap.release()
+    cv2.destroyAllWindows()
     motor_stop()
     pi.set_servo_pulsewidth(SERVO_PIN, 0)
     pi.stop()
-    cv2.destroyAllWindows()
