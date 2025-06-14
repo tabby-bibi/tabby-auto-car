@@ -2,7 +2,7 @@ from picamera2 import Picamera2
 import cv2
 import numpy as np
 '''
-엣지 기반의 그리드 차선 인식 방식의 코드입니다. 
+엣지 기반 그리드 차선 인식 코드 명암 개선1 : 히스토그램 평활화 
 '''
 # PiCamera2 초기화 (최신 방식 사용)
 picam2 = Picamera2()
@@ -26,7 +26,9 @@ def process_frame(frame):
 
     # 전처리
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    # 히스토그램 평활화 - 추가된 부분
+    equalized = cv2.equalizeHist(gray)
+    blur = cv2.GaussianBlur(equalized, (5, 5), 0)
     edges = cv2.Canny(blur, 50, 150)
 
     # 그리드 파라미터

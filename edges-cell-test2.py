@@ -2,7 +2,7 @@ from picamera2 import Picamera2
 import cv2
 import numpy as np
 '''
-엣지 기반의 그리드 차선 인식 방식의 코드입니다. 
+차선 인식 명암 개선 - 2번방식 : Clahe
 '''
 # PiCamera2 초기화 (최신 방식 사용)
 picam2 = Picamera2()
@@ -26,7 +26,11 @@ def process_frame(frame):
 
     # 전처리
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    # CLAHE 방식 적용
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    equalized = clahe.apply(gray)
+
+    blur = cv2.GaussianBlur(equalized, (5, 5), 0)
     edges = cv2.Canny(blur, 50, 150)
 
     # 그리드 파라미터
