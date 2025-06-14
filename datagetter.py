@@ -1,3 +1,5 @@
+# 주행으로 데이터 수집하는 코드
+
 import cv2
 import numpy as np
 import pigpio
@@ -8,6 +10,7 @@ import sys
 import termios
 import tty
 import select
+from picamera2 import Picamera2
 
 # 서보 & 모터 제어 핀 정의
 SERVO_PIN = 18
@@ -19,7 +22,7 @@ pi = pigpio.pi()
 
 # 서보 각도 설정 함수
 def set_servo_angle(angle):
-    pulsewidth = int(500 + (angle / 180.0) * 2000)  # 500~2500us
+    pulsewidth = int(500 + (angle / 180.0) * 2000)
     pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
 # DC 모터 제어
@@ -35,14 +38,14 @@ def motor_stop():
     pi.write(IN1, 0)
     pi.write(IN2, 0)
 
-# 키보드 입력 처리 (방향키 대응)
+# 키보드 입력 처리
 def getkey():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
         ch1 = sys.stdin.read(1)
-        if ch1 == '\x1b':  # 방향키는 ESC [ A/B/C/D 시퀀스로 시작
+        if ch1 == '\x1b':
             ch2 = sys.stdin.read(1)
             ch3 = sys.stdin.read(1)
             if ch2 == '[':
@@ -60,11 +63,14 @@ def getkey():
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
-# 저장 디렉토리
+# 저장 디렉토리 생성
 os.makedirs('data', exist_ok=True)
 
-# 영상 캡처 초기화
-cap = cv2.VideoCapture(0)
+# PiCamera2 초기화
+picam = Picamera2()
+picam.configure(picam.create_preview_configuration(main={"size": (320, 240)}))
+picam.start()
+time.sleep(1)  # 카메라 워밍업
 
 # CSV 저장
 csv_file = open('data/drive_log.csv', mode='w', newline='')
@@ -72,22 +78,19 @@ csv_writer = csv.writer(csv_file)
 csv_writer.writerow(['frame', 'steering_angle', 'throttle'])
 
 frame_count = 0
-steering_angle = 90  # 중립
-throttle = 0         # 정지
+steering_angle = 90
+throttle = 0
 
 try:
     print("↑: 전진, ↓: 후진, ←: 좌회전, →: 우회전, Q: 종료")
 
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+        frame = picam.capture_array()
 
         key = None
         if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
             key = getkey()
 
-        # 방향키 입력 처리
         if key == 'up':
             steering_angle = 90
             set_servo_angle(steering_angle)
@@ -108,7 +111,7 @@ try:
             throttle = 0
             motor_stop()
 
-        # 방향 문자열 (이미지 저장용)
+        # 방향 문자열
         if steering_angle < 80:
             direction = "left"
         elif steering_angle > 100:
@@ -131,8 +134,8 @@ try:
 
 finally:
     csv_file.close()
-    cap.release()
-    cv2.destroyAllWindows()
     motor_stop()
     pi.set_servo_pulsewidth(SERVO_PIN, 0)
     pi.stop()
+    picam.stop()
+    cv2.destroyAllWindows()
