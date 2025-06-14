@@ -1,4 +1,4 @@
-from detect-object import ObjectDetector
+from detect_object import ObjectDetector
 import time
 
 detector = ObjectDetector()

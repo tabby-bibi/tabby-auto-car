@@ -3,7 +3,10 @@ import numpy as np
 import time
 from picamera2 import Picamera2
 from car_controller import CarController
-
+'''
+파이 카메라 사용시 화면 노출 문제가 발생하여, 
+기존 edges.py에서 카메라 설정(화이트밸런싱)등을 조절한 함수입니다.
+'''
 # 관심영역(ROI) 설정 함수
 def region_of_interest(img):
     height, width = img.shape
