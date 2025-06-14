@@ -70,11 +70,11 @@ try:
             motor_backward()
             print("후진")
         elif key == 'a':
-            steering_angle = max(40, steering_angle - 10)
+            steering_angle = max(40, steering_angle - 30)
             set_servo_angle(steering_angle)
             print(f"좌회전: {steering_angle}도")
         elif key == 'd':
-            steering_angle = min(140, steering_angle + 10)
+            steering_angle = min(140, steering_angle + 30)
             set_servo_angle(steering_angle)
             print(f"우회전: {steering_angle}도")
         elif key == 'q':
