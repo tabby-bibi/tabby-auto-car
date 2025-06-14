@@ -1,17 +1,14 @@
-# 주행으로 데이터 수집하는 코드
-
 import pigpio
 import time
 import sys
 import termios
 import tty
-import os
 import cv2
 from picamera2 import Picamera2
 
 # 핀 번호 설정
-SERVO_PIN = 18
-IN1 = 12
+SERVO_PIN = 18   # 서보모터 (조향)
+IN1 = 12         # DC 모터 제어
 IN2 = 13
 
 # pigpio 초기화
@@ -22,7 +19,7 @@ pi.set_mode(IN2, pigpio.OUTPUT)
 # 서보 각도 설정 함수 (0~180도)
 def set_servo_angle(angle):
     angle = max(0, min(180, angle))
-    pulsewidth = 500 + (angle / 180.0) * 2000
+    pulsewidth = 500 + (angle / 180.0) * 2000  # 500~2500us
     pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
 # DC 모터 제어 함수
@@ -38,30 +35,33 @@ def motor_stop():
     pi.write(IN1, 0)
     pi.write(IN2, 0)
 
-# 키보드 입력 받는 함수 (blocking)
+# 키보드 입력 받는 함수 (블로킹)
 def getkey():
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
-        tty.setraw(fd)
+        tty.setraw(sys.stdin.fileno())
         ch = sys.stdin.read(1)
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
-    return ch.lower()
+    return ch
 
-# 저장할 디렉토리 생성
+# 텍스트를 이미지에 넣는 함수
+def put_direction_text(img, direction):
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(img, f"Direction: {direction}", (10, 30), font, 1, (0, 0, 255), 2)
+
+# 초기 상태
+steering_angle = 90  # 중립
+
+import os
 os.makedirs('data', exist_ok=True)
 
-# PiCamera2 초기화 및 시작
+# PiCamera2 초기화
 picam = Picamera2()
 picam.configure(picam.create_preview_configuration(main={"size": (320, 240)}))
 picam.start()
-time.sleep(1)  # 워밍업
-
-# 초기 상태
-steering_angle = 90
-set_servo_angle(steering_angle)
-motor_stop()
+time.sleep(1)  # 카메라 워밍업
 
 frame_count = 0
 
@@ -72,52 +72,52 @@ print(" A : 좌회전")
 print(" D : 우회전")
 print(" Q : 종료")
 
+set_servo_angle(steering_angle)
+motor_stop()
+
 try:
     while True:
-        key = getkey()
-
-        # 카메라 이미지 캡처
         frame = picam.capture_array()
 
+        key = getkey().lower()
+
+        throttle = 0
+        direction = "straight"
+
         if key == 'w':
-            motor_forward()
             throttle = 40
+            motor_forward()
             direction = "straight"
-            print("전진")
         elif key == 's':
-            motor_backward()
             throttle = -40
+            motor_backward()
             direction = "straight"
-            print("후진")
         elif key == 'a':
-            steering_angle = max(40, steering_angle - 10)
+            steering_angle = max(40, steering_angle - 20)
             set_servo_angle(steering_angle)
-            throttle = 0
             direction = "left"
-            print(f"좌회전: {steering_angle}도")
         elif key == 'd':
-            steering_angle = min(140, steering_angle + 10)
+            steering_angle = min(140, steering_angle + 20)
             set_servo_angle(steering_angle)
-            throttle = 0
             direction = "right"
-            print(f"우회전: {steering_angle}도")
         elif key == 'q':
             print("종료")
             break
         else:
             motor_stop()
-            throttle = 0
             direction = "stop"
-            print("정지")
 
-        # 프레임에 방향 텍스트 추가
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, f'Direction: {direction}', (10, 30), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        put_direction_text(frame, direction)
 
-        # 이미지 저장 (파일명에 방향 포함)
+        # 이미지 저장
         filename = f"data/frame_{frame_count:05d}_{direction}.jpg"
         cv2.imwrite(filename, frame)
         frame_count += 1
+
+        # 화면 표시
+        cv2.imshow("RC Car Driving", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
 finally:
     motor_stop()
