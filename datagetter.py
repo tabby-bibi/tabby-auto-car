@@ -1,143 +1,126 @@
-import RPi.GPIO as GPIO
-import time
 import cv2
+import time
 import csv
-import os
+import pigpio
 import sys
-import termios
 import tty
+import termios
 from picamera2 import Picamera2
-import numpy as np
 
-# ==========================
+# pigpio 데몬에 연결
+pi = pigpio.pi()
+if not pi.connected:
+    print("pigpiod가 실행 중인지 확인하세요.")
+    sys.exit()
+
 # 핀 설정
-# ==========================
 SERVO_PIN = 18
-IN1 = 12
-IN2 = 13
+IN1 = 17
+IN2 = 27
 
-# ==========================
-# GPIO 초기화
-# ==========================
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(SERVO_PIN, GPIO.OUT)
-GPIO.setup(IN1, GPIO.OUT)
-GPIO.setup(IN2, GPIO.OUT)
+pi.set_mode(IN1, pigpio.OUTPUT)
+pi.set_mode(IN2, pigpio.OUTPUT)
 
-# 서보 PWM (50Hz)
-servo_pwm = GPIO.PWM(SERVO_PIN, 50)
-servo_pwm.start(0)
-
-# ==========================
-# 서보모터 제어 함수
-# ==========================
+# 서보모터 각도 설정
 def set_servo_angle(angle):
     angle = max(0, min(180, angle))
-    duty = 2.5 + (angle / 180.0) * 10  # 0도: 2.5%, 180도: 12.5%
-    servo_pwm.ChangeDutyCycle(duty)
-    time.sleep(0.05)  # 서보모터 반응 시간
+    pulsewidth = int(500 + (angle / 180.0) * 2000)
+    pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
-# ==========================
-# DC 모터 제어 함수
-# ==========================
-def motor_forward():
-    GPIO.output(IN1, GPIO.HIGH)
-    GPIO.output(IN2, GPIO.LOW)
+# 모터 속도 설정 (0~255)
+def motor_forward(speed=255):
+    pi.set_PWM_dutycycle(IN1, speed)
+    pi.write(IN2, 0)
 
-def motor_backward():
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.HIGH)
+def motor_backward(speed=255):
+    pi.set_PWM_dutycycle(IN2, speed)
+    pi.write(IN1, 0)
 
 def motor_stop():
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.LOW)
+    pi.set_PWM_dutycycle(IN1, 0)
+    pi.set_PWM_dutycycle(IN2, 0)
 
-# ==========================
-# 키 입력 처리 함수 (blocking)
-# ==========================
+# 키 입력 함수 (blocking 방식)
 def getkey():
     fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
+    old = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        ch = sys.stdin.read(1)
+        key = sys.stdin.read(1)
     finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    return ch
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    return key
 
-# ==========================
-# PiCamera2 초기화
-# ==========================
-picam2 = Picamera2()
-picam2.configure(picam2.create_preview_configuration(main={"format": 'RGB888', "size": (320, 240)}))
-picam2.start()
+# 카메라 초기화
+cam = Picamera2()
+cam.preview_configuration.main.size = (320, 240)
+cam.preview_configuration.main.format = "RGB888"
+cam.configure("preview")
+cam.start()
 
-# ==========================
 # 데이터 저장 준비
-# ==========================
-os.makedirs('data', exist_ok=True)
+import os
+os.makedirs("data", exist_ok=True)
 csv_file = open('data/drive_log.csv', mode='w', newline='')
 csv_writer = csv.writer(csv_file)
 csv_writer.writerow(['frame', 'steering_angle', 'throttle'])
 
 frame_count = 0
-steering_angle = 90  # 중립
-throttle = 0         # -1: 후진, 0: 정지, 1: 전진
+steering_angle = 90
+throttle = 0  # 1: 전진, -1: 후진, 0: 정지
+speed = 40   # 모터 속도 (0~255)
 
-print("▶ 키보드 조작 안내: W(전진) S(후진) A(좌) D(우) Q(종료)")
-print("▶ 이미지 저장 및 CSV 라벨 작성 진행 중...")
+print("조작 키: W(전진), S(후진), A(좌), D(우), Q(종료)")
 
 try:
     while True:
-        frame = picam2.capture_array()
+        # 영상 촬영
+        frame = cam.capture_array()
+
+        # 키 입력
         key = getkey().lower()
 
-        # 조작 키 입력 처리
         if key == 'w':
             throttle = 1
-            motor_forward()
+            motor_forward(speed)
         elif key == 's':
             throttle = -1
-            motor_backward()
+            motor_backward(speed)
         elif key == 'a':
-            steering_angle = max(40, steering_angle - 30)
+            steering_angle = max(0, steering_angle - 5)
             set_servo_angle(steering_angle)
         elif key == 'd':
-            steering_angle = min(140, steering_angle + 30)
+            steering_angle = min(180, steering_angle + 5)
             set_servo_angle(steering_angle)
         elif key == 'q':
-            print("▶ 종료")
+            print("종료")
             break
         else:
             throttle = 0
             motor_stop()
 
-        # 화면에 조향 방향 표시
-        direction_text = {
-            -1: "후진",
-            0: "정지",
-            1: "전진"
-        }[throttle]
-        label = f"{direction_text} | 조향: {steering_angle}°"
-        cv2.putText(frame, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
-
         # 이미지 저장
-        filename = f'data/frame_{frame_count:05d}.jpg'
+        filename = f"data/frame_{frame_count:05d}.jpg"
         cv2.imwrite(filename, frame)
 
         # CSV 저장
-        csv_writer.writerow([frame_count, steering_angle, throttle])
-
-        # 화면 출력
-        cv2.imshow("Camera", frame)
-        cv2.waitKey(1)
-
+        csv_writer.writerow([filename, steering_angle, throttle])
         frame_count += 1
 
+        # 실시간 영상 출력
+        display_frame = frame.copy()
+        direction = "STOP" if throttle == 0 else "FORWARD" if throttle == 1 else "BACKWARD"
+        cv2.putText(display_frame, f"{direction}, Angle: {steering_angle}", (10, 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.imshow("Driving Preview", display_frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
 finally:
-    motor_stop()
-    servo_pwm.stop()
-    GPIO.cleanup()
     csv_file.close()
+    cam.stop()
     cv2.destroyAllWindows()
-    picam2.stop()
+    motor_stop()
+    pi.set_servo_pulsewidth(SERVO_PIN, 0)
+    pi.stop()
