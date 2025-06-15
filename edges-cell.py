@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 '''
-Edge-based grid lane detection using PiCamera2.
+그리드 기반 차선 인식 - hsv색공간 기반 흰색/검은색 차선 감지 코드
 '''
 
 # Initialize PiCamera2
@@ -12,7 +12,7 @@ config = picam2.create_preview_configuration(main={"size": (640, 480), "format":
 picam2.configure(config)
 picam2.start()
 
-# Determine driving direction based on lane center
+# Determine driving direction
 def get_direction_text(lane_center, frame_width, threshold=40):
     center_x = frame_width // 2
     diff = lane_center - center_x
@@ -24,14 +24,36 @@ def get_direction_text(lane_center, frame_width, threshold=40):
     else:
         return "Right"
 
-# Frame processing function
+# Process each frame
 def process_frame(frame):
     height, width = frame.shape[:2]
 
     # Preprocessing
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # White mask
+    white_lower = np.array([0, 0, 200])
+    white_upper = np.array([180, 30, 255])
+    white_mask = cv2.inRange(hsv, white_lower, white_upper)
+
+    # Black mask
+    black_lower = np.array([0, 0, 0])
+    black_upper = np.array([180, 255, 50])
+    black_mask = cv2.inRange(hsv, black_lower, black_upper)
+
+    # Combine masks
+    mask = cv2.bitwise_or(white_mask, black_mask)
+
+    # 명암 보정하는 부분
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    equalized = cv2.equalizeHist(gray)
+
+    # Gaussian blur → edge detection
+    blur = cv2.GaussianBlur(equalized, (5, 5), 0)
     edges = cv2.Canny(blur, 50, 150)
+
+    # Apply mask to edges to keep only white/black lines
+    masked_edges = cv2.bitwise_and(edges, mask)
 
     # Grid parameters
     n_rows = 10
@@ -48,7 +70,7 @@ def process_frame(frame):
             x2 = x1 + grid_width
             y2 = y1 + grid_height
 
-            roi = edges[y1:y2, x1:x2]
+            roi = masked_edges[y1:y2, x1:x2]
             ys, xs = np.where(roi > 0)
             if len(xs) > 0:
                 mean_x = int(np.mean(xs))
@@ -61,7 +83,7 @@ def process_frame(frame):
             # Draw grid
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 1)
 
-    # Determine direction from lane centers
+    # Show direction
     if lane_centers:
         lane_center = int(np.mean(lane_centers))
         cv2.line(frame, (lane_center, height), (lane_center, height - 50), (0, 255, 255), 3)
@@ -78,7 +100,7 @@ def process_frame(frame):
 try:
     while True:
         frame = picam2.capture_array()
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # Convert RGB to BGR
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         result = process_frame(frame)
         cv2.imshow("Lane Detection", result)
         if cv2.waitKey(1) == ord('q'):
