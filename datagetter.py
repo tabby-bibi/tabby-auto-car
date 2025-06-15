@@ -110,13 +110,13 @@ try:
             print(f"후진 (속도: {motor_speed})")
             saving_frames = True
         elif key == 'a':
-            steering_angle = max(40, steering_angle - 20)
+            steering_angle = max(0, steering_angle - 20)
             set_servo_angle(steering_angle)
             print(f"좌회전: {steering_angle}도")
             # 조향 시에도 프레임 저장 (주행 중이 아니어도)
             saving_frames = True
         elif key == 'd':
-            steering_angle = min(140, steering_angle + 20)
+            steering_angle = min(180, steering_angle + 20)
             set_servo_angle(steering_angle)
             print(f"우회전: {steering_angle}도")
             saving_frames = True
