@@ -16,6 +16,8 @@ IN2 = 13
 SAVE_DIR = "data"
 FRAME_SAVE = True
 
+motor_speed = 40  # PWM 속도 (0~255)
+
 # === 초기화 ===
 pi = pigpio.pi()
 pi.set_mode(IN1, pigpio.OUTPUT)
@@ -26,17 +28,17 @@ def set_servo_angle(angle):
     pulsewidth = 500 + (angle / 180.0) * 2000
     pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
-def motor_forward():
-    pi.write(IN1, 1)
-    pi.write(IN2, 0)
+def motor_forward(speed=motor_speed):
+    speed = max(0, min(255, speed))
+    pi.set_PWM_dutycycle(IN1, speed)
+    pi.set_PWM_dutycycle(IN2, 0)
 
-def motor_backward():
-    pi.write(IN1, 0)
-    pi.write(IN2, 1)
+def motor_backward(speed=motor_speed):
+    speed = max(0, min(255, speed))
+    pi.set_PWM_dutycycle(IN1, 0)
+    pi.set_PWM_dutycycle(IN2, speed)
 
 def motor_stop():
-    pi.write(IN1, 0)
-    pi.write(IN2, 0)
     pi.set_PWM_dutycycle(IN1, 0)
     pi.set_PWM_dutycycle(IN2, 0)
 
@@ -97,11 +99,11 @@ try:
         key = getkey().lower()
 
         if key == 'w':
-            motor_forward()
-            print("전진")
+            motor_forward(motor_speed)
+            print(f"전진 (속도: {motor_speed})")
         elif key == 's':
-            motor_backward()
-            print("후진")
+            motor_backward(motor_speed)
+            print(f"후진 (속도: {motor_speed})")
         elif key == 'a':
             steering_angle = max(40, steering_angle - 30)
             set_servo_angle(steering_angle)
@@ -146,11 +148,7 @@ finally:
         csv_file.close()
 
     motor_stop()
-    pi.write(IN1, 0)
-    pi.write(IN2, 0)
     pi.set_servo_pulsewidth(SERVO_PIN, 0)
-
-    print(f"IN1 상태: {pi.read(IN1)}, IN2 상태: {pi.read(IN2)}")
 
     pi.stop()
     picam2.stop()
