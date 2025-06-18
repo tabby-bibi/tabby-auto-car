@@ -96,55 +96,55 @@ try:
     while running:
         key = getkey().lower()
 
-        # 기본적으로 saving_frames 초기화
+        # 초기화
         saving_frames = False
-        label = "stop"  # 기본값을 stop으로 설정
+        label = None  # 기본 None
 
         if key == 'w':
             motor_forward(motor_speed)
+            label = "center"
             print(f"전진 (속도: {motor_speed})")
             saving_frames = True
-        elif key == 's':
-            motor_backward(motor_speed)
-            print(f"후진 (속도: {motor_speed})")
-            saving_frames = True
+
         elif key == 'a':
             steering_angle = max(0, steering_angle - 20)
             set_servo_angle(steering_angle)
+            motor_forward(motor_speed)
+            label = "left"
             print(f"좌회전: {steering_angle}도")
             saving_frames = True
+
         elif key == 'd':
             steering_angle = min(180, steering_angle + 20)
             set_servo_angle(steering_angle)
+            motor_forward(motor_speed)
+            label = "right"
             print(f"우회전: {steering_angle}도")
             saving_frames = True
+
+        elif key == 's':
+            motor_backward(motor_speed)
+            print(f"후진 (속도: {motor_speed})")
+            # 후진은 라벨 없이 저장하지 않음
+
         elif key == ' ':
-            # 스페이스바 눌렀을 때도 stop 프레임 저장
             motor_stop()
+            label = "stop"
             print("정지 상태 저장")
             saving_frames = True
-            label = "stop"
+
         elif key == 'q':
             print("종료")
             running = False
             break
+
         else:
             motor_stop()
             print("정지")
-            saving_frames = False
-            continue  # 다음 루프로 이동
-
-        # 조향 각도에 따른 라벨 설정 (단, 정지 상태 예외)
-        if label != "stop":
-            if steering_angle <= 70:
-                label = "left"
-            elif steering_angle >= 110:
-                label = "right"
-            else:
-                label = "center"
+            continue  # 저장 없이 다음 루프로
 
         # 프레임 저장
-        if FRAME_SAVE and latest_frame is not None and saving_frames:
+        if FRAME_SAVE and latest_frame is not None and saving_frames and label:
             filename = f"frame_{frame_count:05d}.jpg"
             path = os.path.join(SAVE_DIR, filename)
             cv2.imwrite(path, latest_frame)
