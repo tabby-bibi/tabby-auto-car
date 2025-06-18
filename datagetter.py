@@ -15,7 +15,6 @@ IN1 = 12
 IN2 = 13
 SAVE_DIR = "data"
 FRAME_SAVE = True
-
 motor_speed = 110  # PWM 속도 (0~255)
 
 # === 초기화 ===
@@ -29,12 +28,10 @@ def set_servo_angle(angle):
     pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
 def motor_forward(speed=motor_speed):
-    speed = max(0, min(255, speed))
     pi.set_PWM_dutycycle(IN1, speed)
     pi.set_PWM_dutycycle(IN2, 0)
 
 def motor_backward(speed=motor_speed):
-    speed = max(0, min(255, speed))
     pi.set_PWM_dutycycle(IN1, 0)
     pi.set_PWM_dutycycle(IN2, speed)
 
@@ -90,17 +87,19 @@ motor_stop()
 print("조작 키 안내:")
 print(" W : 전진 | S : 후진")
 print(" A : 좌회전 | D : 우회전")
+print(" 스페이스바 : 정지 상태 저장")
 print(" Q : 종료")
 
-# 프레임 저장 활성화 여부
-saving_frames = False  
-last_label = None
+saving_frames = False
 
 try:
     while running:
         key = getkey().lower()
 
-        # 각 키 동작 수행
+        # 기본적으로 saving_frames 초기화
+        saving_frames = False
+        label = "stop"  # 기본값을 stop으로 설정
+
         if key == 'w':
             motor_forward(motor_speed)
             print(f"전진 (속도: {motor_speed})")
@@ -113,13 +112,18 @@ try:
             steering_angle = max(0, steering_angle - 20)
             set_servo_angle(steering_angle)
             print(f"좌회전: {steering_angle}도")
-            # 조향 시에도 프레임 저장 (주행 중이 아니어도)
             saving_frames = True
         elif key == 'd':
             steering_angle = min(180, steering_angle + 20)
             set_servo_angle(steering_angle)
             print(f"우회전: {steering_angle}도")
             saving_frames = True
+        elif key == ' ':
+            # 스페이스바 눌렀을 때도 stop 프레임 저장
+            motor_stop()
+            print("정지 상태 저장")
+            saving_frames = True
+            label = "stop"
         elif key == 'q':
             print("종료")
             running = False
@@ -128,22 +132,24 @@ try:
             motor_stop()
             print("정지")
             saving_frames = False
+            continue  # 다음 루프로 이동
 
-        # 저장 라벨 계산
-        if steering_angle < 70:
-            label = "left"
-        elif steering_angle > 110:
-            label = "right"
-        else:
-            label = "center"
+        # 조향 각도에 따른 라벨 설정 (단, 정지 상태 예외)
+        if label != "stop":
+            if steering_angle <= 70:
+                label = "left"
+            elif steering_angle >= 110:
+                label = "right"
+            else:
+                label = "center"
 
         # 프레임 저장
         if FRAME_SAVE and latest_frame is not None and saving_frames:
-            # 연속 저장을 위해 중복 라벨도 저장
             filename = f"frame_{frame_count:05d}.jpg"
             path = os.path.join(SAVE_DIR, filename)
             cv2.imwrite(path, latest_frame)
             csv_writer.writerow([filename, steering_angle, label])
+            print(f"저장: {filename} - {label}")
             frame_count += 1
 
 except KeyboardInterrupt:
@@ -151,7 +157,7 @@ except KeyboardInterrupt:
 
 finally:
     running = False
-    time.sleep(0.5)  # 스레드 종료 대기
+    time.sleep(0.5)
 
     print("=== 종료 정리 중 ===")
     if FRAME_SAVE:
@@ -159,7 +165,6 @@ finally:
 
     motor_stop()
     pi.set_servo_pulsewidth(SERVO_PIN, 0)
-
     pi.stop()
     picam2.stop()
     cv2.destroyAllWindows()
