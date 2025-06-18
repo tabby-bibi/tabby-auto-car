@@ -6,39 +6,39 @@ import tty
 import os
 import cv2
 import csv
+import glob
 import threading
 from picamera2 import Picamera2
 
 # === 설정 ===
 SERVO_PIN = 18
-# IN1 = 12  # 모터 제어 핀, 모터 제어 안함으로 주석 처리
-# IN2 = 13
+IN1 = 12
+IN2 = 13
 SAVE_DIR = "data"
 FRAME_SAVE = True
 motor_speed = 110  # PWM 속도 (0~255)
 
 # === 초기화 ===
 pi = pigpio.pi()
-# pi.set_mode(IN1, pigpio.OUTPUT)
-# pi.set_mode(IN2, pigpio.OUTPUT)
+pi.set_mode(IN1, pigpio.OUTPUT)
+pi.set_mode(IN2, pigpio.OUTPUT)
 
 def set_servo_angle(angle):
     angle = max(0, min(180, angle))
     pulsewidth = 500 + (angle / 180.0) * 2000
     pi.set_servo_pulsewidth(SERVO_PIN, pulsewidth)
 
-# 모터 제어 함수들 주석 처리 (사용 안 함)
-# def motor_forward(speed=motor_speed):
-#     pi.set_PWM_dutycycle(IN1, speed)
-#     pi.set_PWM_dutycycle(IN2, 0)
-#
-# def motor_backward(speed=motor_speed):
-#     pi.set_PWM_dutycycle(IN1, 0)
-#     pi.set_PWM_dutycycle(IN2, speed)
-#
-# def motor_stop():
-#     pi.set_PWM_dutycycle(IN1, 0)
-#     pi.set_PWM_dutycycle(IN2, 0)
+def motor_forward(speed=motor_speed):
+    pi.set_PWM_dutycycle(IN1, speed)
+    pi.set_PWM_dutycycle(IN2, 0)
+
+def motor_backward(speed=motor_speed):
+    pi.set_PWM_dutycycle(IN1, 0)
+    pi.set_PWM_dutycycle(IN2, speed)
+
+def motor_stop():
+    pi.set_PWM_dutycycle(IN1, 0)
+    pi.set_PWM_dutycycle(IN2, 0)
 
 def getkey():
     fd = sys.stdin.fileno()
@@ -65,7 +65,7 @@ def camera_thread():
     global latest_frame, running
     while running:
         frame = picam2.capture_array()
-        latest_frame = frame
+        latest_frame = frame.copy()
         cv2.imshow("Camera View", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             running = False
@@ -76,14 +76,27 @@ threading.Thread(target=camera_thread, daemon=True).start()
 # === 저장 폴더 및 CSV 초기화 ===
 if FRAME_SAVE:
     os.makedirs(SAVE_DIR, exist_ok=True)
-    csv_file = open(os.path.join(SAVE_DIR, "drive_log.csv"), mode="w", newline="")
-    csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(["frame", "steering_angle", "label"])
-    frame_count = 0
 
+    # 기존 프레임 수만큼 frame_count 이어서 시작
+    existing_frames = sorted(glob.glob(os.path.join(SAVE_DIR, "frame_*.jpg")))
+    if existing_frames:
+        last_frame = existing_frames[-1]
+        frame_count = int(os.path.basename(last_frame).split("_")[1].split(".")[0]) + 1
+    else:
+        frame_count = 0
+
+    # CSV 이어쓰기
+    csv_path = os.path.join(SAVE_DIR, "drive_log.csv")
+    file_exists = os.path.exists(csv_path)
+    csv_file = open(csv_path, mode="a", newline="")
+    csv_writer = csv.writer(csv_file)
+    if not file_exists:
+        csv_writer.writerow(["frame", "steering_angle", "label"])
+
+# === 초기 상태 ===
 steering_angle = 90
 set_servo_angle(steering_angle)
-# motor_stop()  # 모터 제어 안 함
+motor_stop()
 
 print("조작 키 안내:")
 print(" W : 전진 | S : 후진")
@@ -98,69 +111,59 @@ try:
         key = getkey().lower()
 
         saving_frames = False
-        label = "stop"  # 기본값 stop으로 시작
+        label = "stop"  # 기본은 정지
 
         if key == 'w':
-            # motor_forward(motor_speed)  # 모터 제어 안함
-            print(f"전진 (속도: {motor_speed})")
+            # 실제로는 정지시켜도 라벨링만 한다면 주석 가능
+            # motor_forward(motor_speed)
+            print("전진")
+            label = "center"
             saving_frames = True
         elif key == 's':
-            # motor_backward(motor_speed)  # 모터 제어 안함
-            print(f"후진 (속도: {motor_speed})")
+            # motor_backward(motor_speed)
+            print("후진")
+            label = "backward"
             saving_frames = True
         elif key == 'a':
             steering_angle = max(0, steering_angle - 20)
             set_servo_angle(steering_angle)
             print(f"좌회전: {steering_angle}도")
+            label = "left"
             saving_frames = True
         elif key == 'd':
             steering_angle = min(180, steering_angle + 20)
             set_servo_angle(steering_angle)
             print(f"우회전: {steering_angle}도")
+            label = "right"
             saving_frames = True
         elif key == ' ':
-            # motor_stop()  # 모터 제어 안함
+            motor_stop()
             print("정지 상태 저장")
-            saving_frames = True
             label = "stop"
+            saving_frames = True
         elif key == 'q':
             print("종료")
             running = False
             break
         else:
-            # motor_stop()  # 모터 제어 안함
-            print("정지")
-            saving_frames = False
+            motor_stop()
             continue
 
-        if label != "stop":
-            if steering_angle < 70:
-                label = "left"
-            elif steering_angle > 110:
-                label = "right"
-            else:
-                label = "center"
-
-        # 라벨 텍스트를 프레임에 그려서 저장
+        # 프레임 저장
         if FRAME_SAVE and latest_frame is not None and saving_frames:
-            frame_with_label = latest_frame.copy()
-            text = label.upper()
-            org = (10, 30)
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 1
-            color = (0, 255, 0)
-            thickness = 2
-            cv2.putText(frame_with_label, text, org, font, font_scale, color, thickness, cv2.LINE_AA)
+            annotated = latest_frame.copy()
+            cv2.putText(annotated, f"{label}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX,
+                        1.2, (0, 255, 0), 3, cv2.LINE_AA)
 
             filename = f"frame_{frame_count:05d}.jpg"
             path = os.path.join(SAVE_DIR, filename)
-            cv2.imwrite(path, frame_with_label)
+            cv2.imwrite(path, annotated)
             csv_writer.writerow([filename, steering_angle, label])
-            print(f"저장: {filename} - {label}")
+            print(f"저장: {filename} - 각도: {steering_angle} - 라벨: {label}")
             frame_count += 1
 
 except KeyboardInterrupt:
-    print("Ctrl+C 강제 종료 감지됨")
+    print("강제 종료됨 (Ctrl+C)")
 
 finally:
     running = False
@@ -170,7 +173,7 @@ finally:
     if FRAME_SAVE:
         csv_file.close()
 
-    # motor_stop()
+    motor_stop()
     pi.set_servo_pulsewidth(SERVO_PIN, 0)
     pi.stop()
     picam2.stop()
