@@ -33,7 +33,7 @@ class SimpleCNN(nn.Module):
 
 # --- 모델 로드 ---
 model = SimpleCNN()
-model.load_state_dict(torch.load("model.pth", map_location=torch.device('cpu')))
+model.load_state_dict(torch.load("drive_model.pth", map_location=torch.device('cpu')))
 model.eval()
 
 # --- 이미지 전처리 정의 ---
@@ -67,7 +67,7 @@ def motor_stop():
 
 # --- 카메라 초기화 (PiCamera2) ---
 picam2 = Picamera2()
-config = picam2.create_preview_configuration(main={"format": 'BGR888', "size": (640, 480)})
+config = picam2.create_preview_configuration(main={"format": 'BGR888', "size": (680, 240)})
 picam2.configure(config)
 picam2.start()
 
@@ -104,7 +104,7 @@ try:
         motor_stop()  # 매 프레임마다 멈춤 (원하면 제거)
 
 except KeyboardInterrupt:
-    print("🛑 자율주행 종료")
+    print(" 자율주행 종료")
 
 finally:
     motor_stop()
