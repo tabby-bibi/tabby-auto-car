@@ -33,7 +33,7 @@ class SimpleCNN(nn.Module):
 
 # --- 모델 불러오기 ---
 model = SimpleCNN()
-model.load_state_dict(torch.load("model.pth", map_location=torch.device('cpu')))
+model.load_state_dict(torch.load("drive_model.pth", map_location=torch.device('cpu')))
 model.eval()
 
 # --- 전처리 정의 ---
