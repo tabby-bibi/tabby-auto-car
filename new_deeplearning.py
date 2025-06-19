@@ -12,7 +12,7 @@ import time
 SERVO_PIN = 18
 IN1 = 12
 IN2 = 13
-motor_speed = 80  # 속도값 (0~255 범위에서 적절히 조절)
+motor_speed = 120  # 속도값 (0~255 범위에서 적절히 조절)
 
 # --- 모델 정의 (SimpleCNN 동일 구조) ---
 class SimpleCNN(nn.Module):
