@@ -130,4 +130,30 @@ try:
         if save_frame and latest_frame is not None:
             annotated = latest_frame.copy()
             text = f"{label}, angle={steering_angle}"
-            cv2.putText(annotated, text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0),
+            cv2.putText(annotated, text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+
+            # ✅ 라벨 포함된 파일명
+            filename = f"frame_{frame_count:05d}_{label}.jpg"
+            filepath = os.path.join(SAVE_DIR, filename)
+            cv2.imwrite(filepath, annotated)
+
+            csv_writer.writerow([filename, steering_angle, label])
+            csv_file.flush()
+            print(f"✅ 저장됨: {filename} | 라벨: {label} | 각도: {steering_angle}")
+            frame_count += 1
+        elif latest_frame is None:
+            print("⚠️ 프레임 없음. 저장 실패.")
+
+except KeyboardInterrupt:
+    print("종료 요청됨 (Ctrl+C)")
+
+finally:
+    running = False
+    time.sleep(0.5)
+    motor_stop()
+    pi.set_servo_pulsewidth(SERVO_PIN, 0)
+    pi.stop()
+    picam2.stop()
+    csv_file.close()
+    cv2.destroyAllWindows()
+    print("정상 종료. 리소스 해제 완료.")
