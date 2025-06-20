@@ -1,5 +1,5 @@
 # 파이카메라2로 방향키로 좌회전 우회전 직진 라벨링만 하는 코드 
-# 모터 구동 코드 막아놓음
+
 import pigpio
 import time
 import sys
