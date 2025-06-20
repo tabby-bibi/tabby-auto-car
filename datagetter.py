@@ -9,6 +9,7 @@ import csv
 import glob
 import threading
 import numpy as np
+import queue
 from picamera2 import Picamera2
 
 # === 설정 ===
@@ -61,6 +62,7 @@ picam2.start()
 # === 글로벌 변수 ===
 latest_frame = None
 running = True
+key_queue = queue.Queue()
 
 def camera_thread():
     global latest_frame, running
@@ -69,10 +71,23 @@ def camera_thread():
         latest_frame = frame.copy()
         cv2.imshow("Camera View", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            # q는 여기서도 종료 신호로 동작
             running = False
             break
 
+def key_input_thread():
+    global running
+    while running:
+        k = getkey().lower()
+        key_queue.put(k)
+        if k == 'q':
+            running = False
+            break
+
+# 카메라 스레드 시작
 threading.Thread(target=camera_thread, daemon=True).start()
+# 키 입력 스레드 시작
+threading.Thread(target=key_input_thread, daemon=True).start()
 
 # === 저장 폴더 및 CSV 초기화 ===
 if FRAME_SAVE:
@@ -103,11 +118,16 @@ print(" A : 좌회전 | D : 우회전")
 print(" 스페이스바 : 정지 상태 저장")
 print(" Q : 종료")
 
-saving_frames = False
-
 try:
     while running:
-        key = getkey().lower()
+        if not key_queue.empty():
+            key = key_queue.get()
+        else:
+            key = None
+
+        if key is None:
+            time.sleep(0.01)
+            continue
 
         saving_frames = False
         label = "stop"  # 기본은 정지
@@ -121,13 +141,13 @@ try:
             label = "backward"
             saving_frames = True
         elif key == 'a':
-            steering_angle = max(0, steering_angle - 20)
+            steering_angle = max(10, steering_angle - 30)
             set_servo_angle(steering_angle)
             print(f"좌회전: {steering_angle}도")
             label = "left"
             saving_frames = True
         elif key == 'd':
-            steering_angle = min(180, steering_angle + 20)
+            steering_angle = min(150, steering_angle + 30)
             set_servo_angle(steering_angle)
             print(f"우회전: {steering_angle}도")
             label = "right"
