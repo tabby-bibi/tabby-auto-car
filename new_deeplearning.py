@@ -103,7 +103,7 @@ def driving_thread():
 
         if prediction == 3:  # stop
             motor_stop()
-            print("■ 정지")
+            print("정지")
             time.sleep(0.1)
             continue
 
@@ -130,14 +130,14 @@ t.start()
 
 # --- 영상 띄우기 & 저장 루프 ---
 try:
-    print("🚗 자율주행 시작 (q 키 종료)")
+    print("자율주행 시작 (q 키 종료)")
     while True:
         frame = picam2.capture_array()
 
         with frame_lock:
             latest_frame = frame.copy()
 
-        cv2.imshow("📷 실시간 주행 영상", frame)
+        cv2.imshow("실시간 주행 영상", frame)
         video_out.write(frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -156,4 +156,4 @@ finally:
     picam2.stop()
     video_out.release()
     cv2.destroyAllWindows()
-    print("🛑 주행 종료 및 영상 저장 완료")
+    print("주행 종료 및 영상 저장 완료")
