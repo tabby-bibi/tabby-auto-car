@@ -1,6 +1,7 @@
 from picamera2 import Picamera2
 import cv2
 import numpy as np
+import time
 
 '''
 그리드 기반 차선 인식 - hsv색공간 기반 흰색/검은색 차선 감지 코드
@@ -102,6 +103,8 @@ try:
         frame = picam2.capture_array()
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         result = process_frame(frame)
+        ## frame 과부화 방지용 슬립 추가
+        time.sleep(0.03)
         cv2.imshow("Lane Detection", result)
         if cv2.waitKey(1) == ord('q'):
             break
