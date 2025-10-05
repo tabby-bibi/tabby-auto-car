@@ -41,6 +41,7 @@ CNN 회귀 모델을 통해 조향각을 예측하고, 이를 기반으로 자�
 | 휴대용 보조배터리 | 전원 공급 |
 
 ![Image](https://github.com/user-attachments/assets/fcb2a593-a4c5-47a7-858f-cb33cb5ece63)
+![Image](https://github.com/user-attachments/assets/2389b943-367e-4547-b5c7-17945c0cd248)
 
 
 
