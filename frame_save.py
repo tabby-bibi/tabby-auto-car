@@ -12,7 +12,7 @@ import glob
 import threading
 from picamera2 import Picamera2
 
-# === 설정 ===
+# 설정
 SERVO_PIN = 18
 IN1 = 12
 IN2 = 13
@@ -20,7 +20,7 @@ SAVE_DIR = "data"
 FRAME_SAVE = True
 motor_speed = 110  # PWM 속도 (0~255)
 
-# === 초기화 ===
+# 초기화
 pi = pigpio.pi()
 pi.set_mode(IN1, pigpio.OUTPUT)
 pi.set_mode(IN2, pigpio.OUTPUT)
@@ -52,14 +52,14 @@ def getkey():
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
     return ch
 
-# === 카메라 초기화 ===
+# 카메라 초기화 
 picam2 = Picamera2()
 picam2.preview_configuration.main.size = (640, 480)
 picam2.preview_configuration.main.format = "BGR888"
 picam2.configure("preview")
 picam2.start()
 
-# === 글로벌 변수 ===
+# 글로벌 변수
 latest_frame = None
 running = True
 
@@ -75,7 +75,7 @@ def camera_thread():
 
 threading.Thread(target=camera_thread, daemon=True).start()
 
-# === 저장 폴더 및 CSV 초기화 ===
+# 저장 폴더 및 CSV 초기화
 if FRAME_SAVE:
     os.makedirs(SAVE_DIR, exist_ok=True)
 
