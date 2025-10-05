@@ -63,7 +63,6 @@ scss
 
 ## CNN 회귀 모델 구조 ##
 
-''' python
 class RegressionCNN(nn.Module):
     def __init__(self):
         super().__init__()
@@ -76,6 +75,7 @@ class RegressionCNN(nn.Module):
             nn.Linear(64 * 17 * 12, 100), nn.ReLU(),
             nn.Linear(100, 1)
         )
+        
 입력: 전방 카메라 이미지 (160×120)
 
 출력: 조향각(정규화된 실수값)
