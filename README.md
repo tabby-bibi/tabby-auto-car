@@ -6,17 +6,144 @@ Raspberry Pi 4 + Pi Camera + 서보모터 + DC 모터(1개)를 이용해
 CNN 회귀 모델을 통해 조향각을 예측하고, 이를 기반으로 자율주행을 구현한 RC카 프로젝트이다.  
 데이터 수집, 모델 학습, 실시간 주행 제어 기능이 포함되어 있습니다.
 
+## 🧠 프로젝트 개요
 
-## 시스템 흐름 ##
+| 항목 | 내용 |
+|------|------|
+| **플랫폼** | Raspberry Pi 4 (64bit) |
+| **카메라** | Pi Camera 2 |
+| **모터 드라이버** | L298N |
+| **구동 모터** | DC 모터 1개 |
+| **조향 모터** | SG90 서보모터 1개 |
+| **학습 방식** | CNN 기반 회귀모델 (PyTorch) |
+| **데이터 수집** | 수동 조종 주행 후 이미지+조향각 저장 |
+| **모델 출력** | Steering Angle (-1.0 ~ 1.0 범위 정규화) |
 
-1. 데이터 수집 단계  
--frame_save.py 사용  
--수동 운전하면서 카메라 프레임 + 조향 값 저장  
+---
 
-2. 모델 학습 단계  
+## 🧩 프로젝트 구조
 
+tabby-auto-car/
+├── collect_data.py # 수동 조종으로 데이터 수집
+├── CNN회귀모델.ipynb # PyTorch 회귀 모델 학습
+├── drive.py # 실시간 자율주행 실행 코드
+├── data/
+│ ├── drive_log.csv # 프레임 이름 + 조향각 데이터
+│ └── images/ # 주행 중 촬영된 이미지
+├── cnn_regression.pth # 학습 완료된 모델 가중치
+└── utils/
+└── motor_control.py # 서보 및 DC 모터 제어 함수
 
-3. 자율주행 실행 단계 
+yaml
+코드 복사
+
+---
+
+## 🧱 하드웨어 구성
+
+| 부품 | 역할 |
+|------|------|
+| Raspberry Pi 4 | 메인 컨트롤러 |
+| Pi Camera 2 | 전방 영상 입력 |
+| L298N | 모터 드라이버 |
+| DC 모터 | 차량 구동 |
+| SG90 서보모터 | 조향 제어 |
+| 18650 배터리 × 2 | 전원 공급 |
+
+---
+
+## ⚙️ 데이터 수집 과정
+
+`collect_data.py`를 실행하여 조종기로 차량을 조작하면  
+카메라 영상과 함께 조향각(servo angle)을 CSV 파일로 기록합니다.
+
+frame, steering_angle
+image_001.jpg, 10
+image_002.jpg, -15
+...
+
+scss
+코드 복사
+
+데이터는 약 3000장 이상 수집되어 모델 학습에 사용되었습니다.
+
+---
+
+## CNN 회귀 모델 구조 ##
+
+```python
+class RegressionCNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, 16, 5, stride=2), nn.ReLU(),
+            nn.Conv2d(16, 32, 5, stride=2), nn.ReLU(),
+            nn.Conv2d(32, 64, 5, stride=2), nn.ReLU()
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(64 * 17 * 12, 100), nn.ReLU(),
+            nn.Linear(100, 1)
+        )
+입력: 전방 카메라 이미지 (160×120)
+
+출력: 조향각(정규화된 실수값)
+
+손실 함수: MSELoss
+
+옵티마이저: Adam (lr=1e-3)
+
+학습 epoch: 20
+
+배치 크기: 32
+
+## 학습 및 모델 저장 ##
+
+CNN회귀모델.ipynb 실행 시 다음 순서로 진행됩니다.
+
+drive_log.csv + 이미지 로드
+
+전처리 (Resize → Normalize → Tensor 변환)
+
+CNN 학습 (MSELoss 기반)
+
+학습 완료 후 가중치 저장:
+
+python
+코드 복사
+torch.save(model.state_dict(), 'cnn_regression.pth')
+🏎️ 실시간 자율주행
+Raspberry Pi에서 카메라 영상 실시간 입력
+
+전처리 후 모델에 입력
+
+모델 예측값 → 조향각(servo)으로 변환
+
+DC 모터 일정 속도 유지로 전진
+
+결과 요약
+항목	결과
+주행 성공률	약 90% (테스트 트랙 기준)
+평균 조향 오차	±3°
+평균 속도	약 0.4 m/s
+학습 이미지 수	약 3,000장
+모델 파라미터 수	약 500K
+
+🧾 참고 사항
+데이터셋은 라즈베리파이에서 직접 수집 (수동 조종 기반)
+
+모델 학습은 Google Colab + PyTorch로 수행
+
+학습 후 .pth 모델 파일을 Raspberry Pi로 전송하여 주행 테스트
+
+회귀모델을 사용함으로써 분류모델 대비 더 자연스러운 steering 제어 가능
+
+## 향후 개선 방향 ##
+
+차선 및 장애물 인식 추가 (OpenCV + Depth Estimation)
+
+속도 제어 알고리즘 개선 (PID + 강화학습)
+
+Web UI 기반 실시간 모니터링 기능 추가
 
 
 
