@@ -1,12 +1,18 @@
 ## Raspberry Pi 기반 자율주행 RC카 ##
 
+
+
+
 ## 프로젝트 개요 ## 
 
 Raspberry Pi 4 + Pi Camera + 서보모터 + DC 모터(1개)를 이용해  
 CNN 회귀 모델을 통해 조향각을 예측하고, 이를 기반으로 자율주행을 구현한 RC카 프로젝트이다.  
 데이터 수집, 모델 학습, 실시간 주행 제어 기능이 포함되어 있습니다.
 
-## 🧠 프로젝트 개요
+
+
+
+## 프로젝트 개요
 
 | 항목 | 내용 |
 |------|------|
@@ -19,27 +25,10 @@ CNN 회귀 모델을 통해 조향각을 예측하고, 이를 기반으로 자�
 | **데이터 수집** | 수동 조종 주행 후 이미지+조향각 저장 |
 | **모델 출력** | Steering Angle (-1.0 ~ 1.0 범위 정규화) |
 
----
 
-## 🧩 프로젝트 구조
 
-tabby-auto-car/
-├── collect_data.py # 수동 조종으로 데이터 수집
-├── CNN회귀모델.ipynb # PyTorch 회귀 모델 학습
-├── drive.py # 실시간 자율주행 실행 코드
-├── data/
-│ ├── drive_log.csv # 프레임 이름 + 조향각 데이터
-│ └── images/ # 주행 중 촬영된 이미지
-├── cnn_regression.pth # 학습 완료된 모델 가중치
-└── utils/
-└── motor_control.py # 서보 및 DC 모터 제어 함수
 
-yaml
-코드 복사
-
----
-
-## 🧱 하드웨어 구성
+## 하드웨어 구성
 
 | 부품 | 역할 |
 |------|------|
@@ -48,13 +37,15 @@ yaml
 | L298N | 모터 드라이버 |
 | DC 모터 | 차량 구동 |
 | SG90 서보모터 | 조향 제어 |
-| 18650 배터리 × 2 | 전원 공급 |
+| 9v li ion battery 배터리 × 2 | 전원 공급 |
+| 휴대용 보조배터리 | 전원 공급 |
 
----
+
+
 
 ## ⚙️ 데이터 수집 과정
 
-`collect_data.py`를 실행하여 조종기로 차량을 조작하면  
+`frame_save.py`를 실행하여 조종기로 차량을 조작하면  
 카메라 영상과 함께 조향각(servo angle)을 CSV 파일로 기록합니다.
 
 frame, steering_angle
@@ -67,11 +58,12 @@ scss
 
 데이터는 약 3000장 이상 수집되어 모델 학습에 사용되었습니다.
 
----
+
+
 
 ## CNN 회귀 모델 구조 ##
 
-```python
+python
 class RegressionCNN(nn.Module):
     def __init__(self):
         super().__init__()
@@ -96,22 +88,24 @@ class RegressionCNN(nn.Module):
 
 배치 크기: 32
 
+
+
+
 ## 학습 및 모델 저장 ##
 
 CNN회귀모델.ipynb 실행 시 다음 순서로 진행됩니다.
 
-drive_log.csv + 이미지 로드
+이미지 로드
 
 전처리 (Resize → Normalize → Tensor 변환)
 
-CNN 학습 (MSELoss 기반)
+CNN 학습 
 
-학습 완료 후 가중치 저장:
+학습 완료 후 가중치 저장
 
-python
-코드 복사
-torch.save(model.state_dict(), 'cnn_regression.pth')
-🏎️ 실시간 자율주행
+
+## 실시간 자율주행 ##
+
 Raspberry Pi에서 카메라 영상 실시간 입력
 
 전처리 후 모델에 입력
@@ -128,7 +122,7 @@ DC 모터 일정 속도 유지로 전진
 학습 이미지 수	약 3,000장
 모델 파라미터 수	약 500K
 
-🧾 참고 사항
+# 참고 사항
 데이터셋은 라즈베리파이에서 직접 수집 (수동 조종 기반)
 
 모델 학습은 Google Colab + PyTorch로 수행
@@ -139,11 +133,11 @@ DC 모터 일정 속도 유지로 전진
 
 ## 향후 개선 방향 ##
 
-차선 및 장애물 인식 추가 (OpenCV + Depth Estimation)
+장애물 인식과 장애물 회피 기능 추가
 
-속도 제어 알고리즘 개선 (PID + 강화학습)
+속도 제어 알고리즘 개선 (강화학습)
 
-Web UI 기반 실시간 모니터링 기능 추가
+실시간 모니터링 기능 추가
 
 
 
