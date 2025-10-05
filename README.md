@@ -63,30 +63,6 @@ scss
 
 ## CNN 회귀 모델 구조 ##
 
-class RegressionCNN(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(3, 16, 5, stride=2), nn.ReLU(),
-            nn.Conv2d(16, 32, 5, stride=2), nn.ReLU(),
-            nn.Conv2d(32, 64, 5, stride=2), nn.ReLU()
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(64 * 17 * 12, 100), nn.ReLU(),
-            nn.Linear(100, 1)
-        )
-        
-입력: 전방 카메라 이미지 (160×120)
-
-출력: 조향각(정규화된 실수값)
-
-손실 함수: MSELoss
-
-옵티마이저: Adam (lr=1e-3)
-
-학습 epoch: 20
-
-배치 크기: 32
 
 
 
