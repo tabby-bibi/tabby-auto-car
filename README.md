@@ -126,7 +126,7 @@ DC 모터 일정 속도 유지로 전진
 
 
 
-프로젝트에 할때 참고 했던 자료들입니다 
+## 참고자료
 
 http://lhdangerous.godohosting.com/wiki/index.php/Raspberry_pi_%ec%97%90%ec%84%9c_python%ec%9c%bc%eb%a1%9c_GPIO_%ec%82%ac%ec%9a%a9%ed%95%98%ea%b8%b0
 
