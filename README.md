@@ -63,7 +63,7 @@ scss
 
 ## CNN 회귀 모델 구조 ##
 
-python
+''' python
 class RegressionCNN(nn.Module):
     def __init__(self):
         super().__init__()
