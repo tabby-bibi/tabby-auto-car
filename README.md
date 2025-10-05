@@ -43,7 +43,7 @@ CNN 회귀 모델을 통해 조향각을 예측하고, 이를 기반으로 자�
 
 
 
-## ⚙️ 데이터 수집 과정
+## 데이터 수집 과정
 
 `frame_save.py`를 실행하여 조종기로 차량을 조작하면  
 카메라 영상과 함께 조향각(servo angle)을 CSV 파일로 기록합니다.
@@ -63,7 +63,7 @@ scss
 
 ## CNN 회귀 모델 구조 ##
 
-
+https://github.com/tabby-bibi/tabby-auto-car/blob/main/CNN%ED%9A%8C%EA%B7%80%EB%AA%A8%EB%8D%B8.ipynb
 
 
 
