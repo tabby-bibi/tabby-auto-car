@@ -72,13 +72,7 @@ https://github.com/tabby-bibi/tabby-auto-car/blob/main/CNN%ED%9A%8C%EA%B7%80%EB%
 
 CNN회귀모델.ipynb 실행 시 다음 순서로 진행됩니다.
 
-이미지 로드
-
-전처리 (Resize → Normalize → Tensor 변환)
-
-CNN 학습 
-
-학습 완료 후 가중치 저장
+이미지 로드 - 전처리 - CNN 학습 - 학습 완료 후 가중치 저장
 
 
 ## 실시간 자율주행 ##
