@@ -10,6 +10,7 @@ CNN 회귀 모델을 통해 조향각을 예측하고, 이를 기반으로 자�
 데이터 수집, 모델 학습, 실시간 주행 제어 기능이 포함되어 있습니다.
 
 
+![KakaoTalk_20251005_224527413](https://github.com/user-attachments/assets/fc944bb7-d749-40e8-b56c-adbc3727e7e8)
 
 
 ## 프로젝트 개요
