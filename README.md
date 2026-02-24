@@ -1,30 +1,27 @@
-## Raspberry Pi 기반 자율주행 RC카 ##
+Raspberry Pi-Based Autonomous RC Car using CNN Regression
+Project Overview
 
+This project implements an autonomous RC car using a Raspberry Pi 4, Pi Camera, servo motor, and DC motor.
+A CNN regression model predicts the steering angle from camera input, enabling real-time autonomous driving.
 
+The project includes:
 
+Data collection system
 
-## 프로젝트 개요 ## 
+CNN model training pipeline
 
-Raspberry Pi 4 + Pi Camera + 서보모터 + DC 모터를 이용해  
-CNN 회귀 모델을 통해 조향각을 예측하고, 이를 기반으로 자율주행을 구현한 RC카 프로젝트이다.  
-데이터 수집, 모델 학습, 실시간 주행 제어 기능이 포함되어 있습니다.
+Real-time autonomous driving control system
 
-
-![KakaoTalk_20251005_224527413](https://github.com/user-attachments/assets/fc944bb7-d749-40e8-b56c-adbc3727e7e8)
-
-
-## 프로젝트 개요
-
-| 항목 | 내용 |
-|------|------|
-| **플랫폼** | Raspberry Pi 4 (64bit) |
-| **카메라** | Pi Camera 2 |
-| **모터 드라이버** | L298N |
-| **구동 모터** | DC 모터 1개 |
-| **조향 모터** | SG90 서보모터 1개 |
-| **학습 방식** | CNN 기반 회귀모델 (PyTorch) |
-| **데이터 수집** | 수동 조종 주행 후 이미지+조향각 저장 |
-| **모델 출력** | Steering Angle (-1.0 ~ 1.0 범위 정규화) |
+Project Specifications
+Item	Description
+Platform	Raspberry Pi 4 (64-bit)
+Camera	Pi Camera 2
+Motor Driver	L298N
+Drive Motor	1 DC motor
+Steering Motor	1 SG90 Servo motor
+Training Method	CNN-based regression model (PyTorch)
+Data Collection	Manual driving with synchronized image and steering angle recording
+Model Output	Steering angle normalized between -1.0 and 1.0
 
 
 
