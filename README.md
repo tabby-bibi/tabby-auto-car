@@ -1,5 +1,7 @@
 # Raspberry Pi-Based Autonomous RC Car using CNN Regression
 
+![Image](https://github.com/user-attachments/assets/7adc6bf2-f083-47e5-afa2-2271fa7402fb)
+
 ## Project Overview
 
 This project implements an autonomous RC car using a Raspberry Pi 4, Pi Camera, servo motor, and DC motor.
