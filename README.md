@@ -116,7 +116,7 @@ The autonomous driving process works as follows:
 
 | Metric                 | Result                                     |
 | ---------------------- | ------------------------------------------ |
-| Driving success rate   | Approximately 90% (test track environment) |
+| Driving success rate   | Approximately 70% (test track environment) |
 | Average steering error | ±3°                                        |
 | Average speed          | Approximately 0.4 m/s                      |
 | Training dataset size  | Approximately 3,000 images                 |
