@@ -176,4 +176,4 @@ DeepThinkCar Mini Project:
 python evaluate_val.py --data data --weights model_regression.pth
 ```
 
-Trained weights: TODO (upload the real `model_regression.pth`, or link where it is hosted).
+Trained weights: not included. Run `CNN_regression_model.ipynb` to produce `model_regression.pth`, which `model_new.py` and `evaluate_val.py` load.
