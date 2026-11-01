@@ -9,7 +9,7 @@ A CNN regression model predicts the steering angle from camera input, enabling r
 
 **Result: ~70% success on the test track, ~0.4 m/s average speed.**
 
-**Team project — my part:** TODO (for example: data-collection script `frame_save.py`, CNN training, on-car inference `model_new.py`). Team members: TODO.
+**My part:** the whole pipeline — data collection (`frame_save.py`), CNN training (`CNN_regression_model.ipynb`) and on-car inference (`model_new.py`).
 
 The project includes:
 
