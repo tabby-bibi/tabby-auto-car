@@ -72,7 +72,7 @@ transform = transforms.Compose([
 
 # === 카메라 초기화 ===
 picam2 = Picamera2()
-picam2.preview_configuration.main.size = (680, 480)
+picam2.preview_configuration.main.size = (640, 480)  # same resolution as frame_save.py (training data)
 picam2.preview_configuration.main.format = "BGR888"
 picam2.configure("preview")
 picam2.start()
