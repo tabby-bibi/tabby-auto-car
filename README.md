@@ -130,7 +130,6 @@ The autonomous driving process works as follows:
 | Metric                 | Result                                     |
 | ---------------------- | ------------------------------------------ |
 | Driving success rate   | Approximately 70% (test track environment) |
-| Average steering error | ±3° (TODO: how it was measured — see `evaluate_val.py`) |
 | Average speed          | Approximately 0.4 m/s                      |
 | Training dataset size  | Approximately 3,000 images                 |
 | Model parameters       | 1,371,113                                  |
@@ -169,7 +168,7 @@ DeepThinkCar Mini Project:
 
 ---
 
-## Reproducing the steering error
+## Measuring the steering error
 
 `evaluate_val.py` loads the trained weights and reports the mean absolute steering error in degrees on a held-out 20% of the frames:
 
